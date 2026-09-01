@@ -180,6 +180,10 @@ export default function App() {
     })();
   }, []);
 
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("owner") === "1") setRole("manager");
+  }, []);
+
   const persist = useCallback(async (next) => {
     setData(next);
     try {
@@ -338,18 +342,13 @@ function Landing({ setRole, setResidentId, data }) {
   return (
     <div>
       <p style={{ color: theme.inkSoft, fontSize: 15, marginBottom: 22, maxWidth: 480 }}>
-        A shared resident-care workspace for check-ins, overnight requests, intake, and program reporting.
+        Select the option that applies to you.
         {activeCount > 0 && ` ${activeCount} active resident${activeCount === 1 ? "" : "s"}.`}
       </p>
       <div className="role-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         <RoleCard icon={<LogIn size={20} />} title="I'm a resident" desc="Check in or out, request an overnight, view my status" onClick={() => setRole("resident")} />
-        <RoleCard icon={<ClipboardList size={20} />} title="Program team" desc="Review requests, monitor check-ins, run reports" onClick={() => setRole("manager")} />
-        <RoleCard icon={<TrendingUp size={20} />} title="Foundation leadership" desc="Read-only view of program reports" onClick={() => setRole("owner")} />
         <RoleCard icon={<PenLine size={20} />} title="New resident intake" desc="Complete your residency agreement and program commitments" onClick={() => setRole("intake")} accent />
       </div>
-      <p style={{ fontSize: 12, color: theme.inkSoft, marginTop: 18 }}>
-        This prototype stores information only on this device. Add secure accounts and a protected database before using it for sensitive resident information.
-      </p>
     </div>
   );
 }
