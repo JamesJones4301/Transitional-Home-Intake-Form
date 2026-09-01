@@ -12,7 +12,7 @@ const STORAGE_KEY = "ashrei-impact-resident-care";
 const GOOGLE_CLIENT_ID = "763224714860-t1srggj7a6jp14iceh40c1c0g6gcf87h.apps.googleusercontent.com";
 const GOOGLE_SHEET_ID = "13yiU4efcTMpriA10i4_xS50gIlAN4tbAi6BaF9StKH0";
 const GOOGLE_OWNER_EMAIL = "ashreiimpactfoundation@gmail.com";
-const GOOGLE_SHEETS_SCOPE = "openid email https://www.googleapis.com/auth/spreadsheets";
+const GOOGLE_SIGN_IN_SCOPE = "openid email";
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const DEFAULT_CURFEWS = { 0: "23:00", 1: "21:00", 2: "21:00", 3: "21:00", 4: "21:00", 5: "23:00", 6: "23:00" };
 
@@ -38,19 +38,8 @@ function uid() {
 
 function defaultData() {
   const now = Date.now();
-  const residents = [
-    { id: "resident-maya", name: "Maya Johnson", phone: "(555) 014-2031", email: "maya@example.org", room: "201", bed: "A", admissionDate: now - 18 * 86400000, active: true, leaseSigned: true, signedAt: now - 18 * 86400000, consentDrugTest: true },
-    { id: "resident-daniel", name: "Daniel Brooks", phone: "(555) 014-2088", email: "daniel@example.org", room: "204", bed: "B", admissionDate: now - 8 * 86400000, active: true, leaseSigned: true, signedAt: now - 8 * 86400000, consentDrugTest: true },
-  ];
   return {
-    tenants: residents,
-    checkins: [
-      { id: "check-maya", tenantId: "resident-maya", type: "in", timestamp: now - 45 * 60000, onTime: true },
-      { id: "check-daniel", tenantId: "resident-daniel", type: "out", timestamp: now - 3 * 3600000, onTime: true },
-    ],
-    requests: [
-      { id: "request-maya", tenantId: "resident-maya", requestedDate: new Date(now + 4 * 86400000).toISOString().slice(0, 10), returnDate: new Date(now + 5 * 86400000).toISOString().slice(0, 10), status: "pending", createdAt: now - 2 * 3600000, decidedAt: null, decidedBy: null, testRequired: true, testResult: null, eligibleAtRequest: true },
-    ],
+    tenants: [], checkins: [], requests: [],
     settings: { curfews: { ...DEFAULT_CURFEWS }, managerName: "Program coordinator", managerPhone: "" },
     auditLog: [],
     notifications: [],
@@ -81,7 +70,7 @@ function requestGoogleToken() {
   return new Promise((resolve, reject) => {
     const client = window.google.accounts.oauth2.initTokenClient({
       client_id: GOOGLE_CLIENT_ID,
-      scope: GOOGLE_SHEETS_SCOPE,
+      scope: GOOGLE_SIGN_IN_SCOPE,
       callback: response => response.error ? reject(new Error(response.error)) : resolve(response.access_token),
       error_callback: () => reject(new Error("Google sign-in was cancelled or blocked.")),
     });
@@ -116,24 +105,17 @@ async function googleRequest(path, token, options = {}) {
 }
 
 async function loadGoogleData(token) {
-  const range = encodeURIComponent("'Portal State'!A1");
-  const result = await googleRequest(`/values/${range}`, token);
-  const saved = result.values?.[0]?.[0];
-  return saved ? JSON.parse(saved) : null;
+  const response = await fetch("/api/portal", { headers: { Authorization: `Bearer ${token}` } });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "Owner data could not be loaded.");
+  return result.data;
 }
 
 async function saveGoogleData(data, token) {
-  const rows = sheetRows(data);
-  await googleRequest("/values:batchClear", token, {
-    method: "POST",
-    body: JSON.stringify({ ranges: ["Residents!A2:Q1000", "'Check-Ins'!A2:H1000", "'Overnight Requests'!A2:J1000", "'Program Settings'!A2:C1000", "'Audit Log'!A2:G2001", "Notifications!A2:G2001"] }),
-  });
-  const updates = [{ range: "'Portal State'!A1", values: [[JSON.stringify(data)]] }];
-  for (const [name, values] of Object.entries(rows)) if (values.length) updates.push({ range: `'${name}'!A2`, values });
-  await googleRequest("/values:batchUpdate", token, {
-    method: "POST",
-    body: JSON.stringify({ valueInputOption: "RAW", data: updates }),
-  });
+  const response = await fetch("/api/portal", { method: "PUT", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ data }) });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "Owner data could not be saved.");
+  return result.data;
 }
 
 function daysBetween(a, b) {
@@ -189,13 +171,13 @@ export default function App() {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       if (googleAccessToken) {
-        setSyncStatus("Saving to Google Sheets…");
+        setSyncStatus("Saving securely…");
         await saveGoogleData(next, googleAccessToken);
         setSyncStatus("Saved to Google Sheets");
       }
     } catch {
-      setSyncStatus("Google Sheets needs attention");
-      setError("Changes are showing on this device, but Google Sheets could not save them. Reconnect Google and try again.");
+      setSyncStatus("Secure connection needs attention");
+      setError("Changes could not be saved to the private system. Reconnect as Owner and try again.");
     }
   }, [googleAccessToken]);
 
@@ -221,7 +203,7 @@ export default function App() {
       }
       setGoogleAccessToken(token);
       setGoogleUser(profile.email);
-      setSyncStatus("Connected to Google Sheets");
+      setSyncStatus("Owner connection verified");
     } catch (e) {
       setGoogleAccessToken(null);
       setGoogleUser(null);
@@ -396,38 +378,23 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
   const [consentTest, setConsentTest] = useState(false);
   const [signature, setSignature] = useState("");
   const [done, setDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const canSubmit = form.name && form.phone && form.room && form.bed && agreeLease && agreeRules && agreeOccupancyTerms &&
     signature.trim().toLowerCase() === form.name.trim().toLowerCase() && signature.trim().length > 1;
 
   const submit = async () => {
-    const next = JSON.parse(JSON.stringify(data));
-    const tenant = {
-      id: uid(),
-      name: form.name.trim(),
-      phone: form.phone.trim(),
-      email: form.email.trim(),
-      room: form.room.trim(),
-      bed: form.bed.trim(),
-      admissionDate: new Date(form.admissionDate).getTime(),
-      active: false,
-      approvalStatus: "pending",
-      submittedAt: Date.now(),
-      leaseSigned: true,
-      signedAt: Date.now(),
-      consentDrugTest: consentTest,
-      occupancyTermsAccepted: true,
-      administrativeFee: 150,
-      paymentsNonRefundable: true,
-    };
-    next.tenants.push(tenant);
-    addAudit(next, tenant.name, "intake_submitted", `Submitted for program-team approval. Requested Room ${tenant.room}, Bed ${tenant.bed}. Drug-test consent: ${consentTest ? "yes" : "no"}.`);
-    if (tenant.email) {
-      addNotification(next, tenant.email, "email",
-        `Thank you, ${tenant.name}. Your intake application is pending program-team approval. You will receive an update once it has been reviewed. (Simulated: connect email delivery to send this.)`);
+    setSubmitting(true);
+    try {
+      const response = await fetch("/api/public-submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "intake", ...form, consentDrugTest: consentTest, agreementAccepted: true }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Your application could not be submitted.");
+      setDone(true);
+    } catch (error) {
+      window.alert(error.message || "Your application could not be submitted. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-    await persist(next);
-    setDone(true);
   };
 
   if (done) {
@@ -497,8 +464,8 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
         Typing your name records your acknowledgement with a timestamp in this prototype.
       </p>
 
-      <button disabled={!canSubmit} onClick={submit} style={canSubmit ? btnPrimary : btnDisabled}>
-        Sign and submit
+      <button disabled={!canSubmit || submitting} onClick={submit} style={canSubmit && !submitting ? btnPrimary : btnDisabled}>
+        {submitting ? "Submitting securely…" : "Sign and submit"}
       </button>
     </Panel>
   );
