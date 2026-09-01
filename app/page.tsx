@@ -253,7 +253,9 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
       room: form.room.trim(),
       bed: form.bed.trim(),
       admissionDate: new Date(form.admissionDate).getTime(),
-      active: true,
+      active: false,
+      approvalStatus: "pending",
+      submittedAt: Date.now(),
       leaseSigned: true,
       signedAt: Date.now(),
       consentDrugTest: consentTest,
@@ -262,10 +264,10 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
       paymentsNonRefundable: true,
     };
     next.tenants.push(tenant);
-    addAudit(next, tenant.name, "occupancy_agreement_signed", `Accepted occupancy terms; assigned to Room ${tenant.room}, Bed ${tenant.bed}. Drug-test consent: ${consentTest ? "yes" : "no"}.`);
+    addAudit(next, tenant.name, "intake_submitted", `Submitted for program-team approval. Requested Room ${tenant.room}, Bed ${tenant.bed}. Drug-test consent: ${consentTest ? "yes" : "no"}.`);
     if (tenant.email) {
       addNotification(next, tenant.email, "email",
-        `Welcome ${tenant.name} — attached: your signed occupancy agreement and community commitments. Your assignment is Room ${tenant.room}, Bed ${tenant.bed}. (Simulated: connect email delivery to send this.)`);
+        `Thank you, ${tenant.name}. Your intake application is pending program-team approval. You will receive an update once it has been reviewed. (Simulated: connect email delivery to send this.)`);
     }
     await persist(next);
     setDone(true);
@@ -276,9 +278,9 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
       <Panel>
         <div style={{ textAlign: "center", padding: "1rem 0" }}>
           <ShieldCheck size={30} color={theme.accent} style={{ marginBottom: 10 }} />
-          <div style={{ fontWeight: 600, fontSize: 17, marginBottom: 6 }}>Occupancy agreement signed — welcome</div>
+          <div style={{ fontWeight: 600, fontSize: 17, marginBottom: 6 }}>Application submitted for review</div>
           <p style={{ color: theme.inkSoft, fontSize: 14, marginBottom: 18 }}>
-            Your Room {form.room}, Bed {form.bed} assignment is recorded. A copy of the signed agreement would be emailed to {form.email || "your email"} once email delivery is connected.
+            Your requested Room {form.room}, Bed {form.bed} assignment will be confirmed by the program team. We will email {form.email || "you"} once a decision is made.
           </p>
           <button onClick={onDone} style={btnPrimary}>Back to home</button>
         </div>
@@ -510,7 +512,7 @@ function ManagerView({ data, persist, addAudit, addNotification, readOnly }) {
   const [tab, setTab] = useState(readOnly ? "reports" : "today");
   const tabs = readOnly
     ? [["reports", "Reports"]]
-    : [["today", "Today"], ["assignments", "Rooms & beds"], ["requests", "Overnight requests"], ["reports", "Reports"], ["comms", "Notifications"], ["settings", "Settings"]];
+    : [["today", "Today"], ["intakes", "Intake approvals"], ["assignments", "Rooms & beds"], ["requests", "Overnight requests"], ["reports", "Reports"], ["comms", "Notifications"], ["settings", "Settings"]];
 
   return (
     <div>
@@ -520,6 +522,7 @@ function ManagerView({ data, persist, addAudit, addNotification, readOnly }) {
         ))}
       </div>
       {tab === "today" && <TodayTab data={data} />}
+      {tab === "intakes" && <IntakeApprovalsTab data={data} persist={persist} addAudit={addAudit} addNotification={addNotification} />}
       {tab === "assignments" && <AssignmentsTab data={data} persist={persist} addAudit={addAudit} />}
       {tab === "requests" && <RequestsTab data={data} persist={persist} addAudit={addAudit} addNotification={addNotification} />}
       {tab === "reports" && <ReportsTab data={data} />}
@@ -620,6 +623,67 @@ function AssignmentsTab({ data, persist, addAudit }) {
         </div>
       )}
     </Panel>
+  );
+}
+
+function IntakeApprovalsTab({ data, persist, addAudit, addNotification }) {
+  const pending = data.tenants.filter(t => t.approvalStatus === "pending").sort((a, b) => (a.submittedAt || 0) - (b.submittedAt || 0));
+  const reviewed = data.tenants.filter(t => t.approvalStatus === "approved" || t.approvalStatus === "denied").sort((a, b) => (b.reviewedAt || 0) - (a.reviewedAt || 0)).slice(0, 15);
+
+  const decide = async (applicant, status) => {
+    const next = JSON.parse(JSON.stringify(data));
+    const record = next.tenants.find(t => t.id === applicant.id);
+    if (status === "approved") {
+      const conflict = next.tenants.find(t => t.id !== record.id && t.active && (t.room || "").toLowerCase() === (record.room || "").toLowerCase() && (t.bed || "").toLowerCase() === (record.bed || "").toLowerCase());
+      if (conflict) {
+        window.alert(`Room ${record.room}, Bed ${record.bed} is already assigned to ${conflict.name}. Update the room and bed before approving this application.`);
+        return;
+      }
+      record.active = true;
+    }
+    record.approvalStatus = status;
+    record.reviewedAt = Date.now();
+    record.reviewedBy = next.settings.managerName;
+    addAudit(next, next.settings.managerName, `intake_${status}`, `${status} intake application for ${record.name}.`);
+    if (record.email) {
+      addNotification(next, record.email, "email", status === "approved"
+        ? `Your residency application has been approved. Your confirmed assignment is Room ${record.room}, Bed ${record.bed}. (Simulated email.)`
+        : "Your residency application was not approved at this time. Please contact the program coordinator with any questions. (Simulated email.)");
+    }
+    await persist(next);
+  };
+
+  return (
+    <div>
+      <Panel title="Pending intake applications" subtitle="Approve an application to activate the resident and confirm their room and bed assignment.">
+        {pending.length === 0 ? <EmptyState text="No intake applications are waiting for review." /> : (
+          <div style={{ display: "grid", gap: 10 }}>
+            {pending.map(applicant => (
+              <div key={applicant.id} style={{ ...listRow, alignItems: "flex-start", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", width: "100%", gap: 12 }}>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{applicant.name}</div>
+                    <div style={{ fontSize: 13, color: theme.inkSoft }}>{applicant.phone} · {applicant.email || "No email"}</div>
+                    <div style={{ fontSize: 13, color: theme.inkSoft, marginTop: 3 }}>Requested assignment: Room {applicant.room}, Bed {applicant.bed}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button aria-label={`Approve ${applicant.name}`} onClick={() => decide(applicant, "approved")} style={btnSmallPrimary}><Check size={14} /></button>
+                    <button aria-label={`Deny ${applicant.name}`} onClick={() => decide(applicant, "denied")} style={btnSmallDanger}><X size={14} /></button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
+      <Panel title="Recent intake decisions">
+        {reviewed.length === 0 ? <EmptyState text="No applications have been reviewed yet." /> : (
+          <div style={{ display: "grid", gap: 6 }}>
+            {reviewed.map(applicant => <div key={applicant.id} style={listRow}><span>{applicant.name} · Room {applicant.room}, Bed {applicant.bed}</span><Badge tone={applicant.approvalStatus === "approved" ? "accent" : "red"}>{applicant.approvalStatus}</Badge></div>)}
+          </div>
+        )}
+      </Panel>
+    </div>
   );
 }
 
