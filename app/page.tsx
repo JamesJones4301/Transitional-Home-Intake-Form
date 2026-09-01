@@ -181,7 +181,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("owner") === "1") setRole("manager");
+    if (new URLSearchParams(window.location.search).get("owner") === "1") setRole("ownerMenu");
   }, []);
 
   const persist = useCallback(async (next) => {
@@ -283,6 +283,10 @@ export default function App() {
             setResidentId={setResidentId}
           />
         )}
+        {role === "ownerMenu" && !googleAccessToken && (
+          <GoogleSheetAccess onConnect={connectGoogle} status={syncStatus} />
+        )}
+        {role === "ownerMenu" && googleAccessToken && <OwnerMenu setRole={setRole} />}
         {(role === "manager" || role === "owner") && !googleAccessToken && (
           <GoogleSheetAccess onConnect={connectGoogle} status={syncStatus} />
         )}
@@ -311,6 +315,20 @@ function GoogleSheetAccess({ onConnect, status }) {
       <button onClick={onConnect} style={btnPrimary}><ShieldCheck size={16} /> Connect Google Sheet</button>
       <div style={{ marginTop: 10, fontSize: 12, color: theme.inkSoft }}>{status}</div>
     </Panel>
+  );
+}
+
+function OwnerMenu({ setRole }) {
+  return (
+    <div>
+      <p style={{ color: theme.inkSoft, fontSize: 15, marginBottom: 22, maxWidth: 480 }}>
+        Owner management workspace. Choose the view you need.
+      </p>
+      <div className="role-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <RoleCard icon={<ClipboardList size={20} />} title="Program team" desc="Review requests, monitor check-ins, run reports" onClick={() => setRole("manager")} />
+        <RoleCard icon={<TrendingUp size={20} />} title="Foundation leadership" desc="Read-only view of program reports" onClick={() => setRole("owner")} />
+      </div>
+    </div>
   );
 }
 
