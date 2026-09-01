@@ -9,6 +9,10 @@ import {
 } from "lucide-react";
 
 const STORAGE_KEY = "ashrei-impact-resident-care";
+const GOOGLE_CLIENT_ID = "763224714860-t1srggj7a6jp14iceh40c1c0g6gcf87h.apps.googleusercontent.com";
+const GOOGLE_SHEET_ID = "13yiU4efcTMpriA10i4_xS50gIlAN4tbAi6BaF9StKH0";
+const GOOGLE_OWNER_EMAIL = "ashreiimpactfoundation@gmail.com";
+const GOOGLE_SHEETS_SCOPE = "openid email https://www.googleapis.com/auth/spreadsheets";
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const DEFAULT_CURFEWS = { 0: "23:00", 1: "21:00", 2: "21:00", 3: "21:00", 4: "21:00", 5: "23:00", 6: "23:00" };
 
@@ -53,6 +57,85 @@ function defaultData() {
   };
 }
 
+function loadGoogleIdentity() {
+  if (window.google?.accounts?.oauth2) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-google-identity]');
+    if (existing) {
+      existing.addEventListener("load", resolve, { once: true });
+      existing.addEventListener("error", () => reject(new Error("Google sign-in could not load.")), { once: true });
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.dataset.googleIdentity = "true";
+    script.onload = resolve;
+    script.onerror = () => reject(new Error("Google sign-in could not load."));
+    document.head.appendChild(script);
+  });
+}
+
+function requestGoogleToken() {
+  return new Promise((resolve, reject) => {
+    const client = window.google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: GOOGLE_SHEETS_SCOPE,
+      callback: response => response.error ? reject(new Error(response.error)) : resolve(response.access_token),
+      error_callback: () => reject(new Error("Google sign-in was cancelled or blocked.")),
+    });
+    client.requestAccessToken({ prompt: "select_account" });
+  });
+}
+
+function iso(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+}
+
+function sheetRows(data) {
+  return {
+    Residents: data.tenants.map(t => [t.id, t.name, t.phone || "", t.email || "", t.room || "", t.bed || "", iso(t.admissionDate), Boolean(t.active), iso(t.signedAt), Boolean(t.consentDrugTest), Boolean(t.occupancyTermsAccepted), t.administrativeFee || 150, Boolean(t.paymentsNonRefundable), t.approvalStatus || (t.active ? "approved" : "pending"), iso(t.submittedAt), t.reviewedBy || "", iso(t.reviewedAt)]),
+    "Check-Ins": data.checkins.map(c => { const d = new Date(c.timestamp); return [c.id, c.tenantId, data.tenants.find(t => t.id === c.tenantId)?.name || "", c.type, d.toISOString().slice(0, 10), d.toLocaleTimeString(), c.onTime ? "On time" : "Late", c.notes || ""]; }),
+    "Overnight Requests": data.requests.map(r => [r.id, r.tenantId, data.tenants.find(t => t.id === r.tenantId)?.name || "", r.destination || "", r.requestedDate || "", r.returnDate || "", r.reason || "", r.status, r.decidedBy || "", iso(r.decidedAt)]),
+    "Program Settings": [["Coordinator Name", data.settings.managerName || ""], ["Coordinator Phone", data.settings.managerPhone || ""], ...DAY_NAMES.map((day, index) => [`Curfew ${day}`, data.settings.curfews[index] || ""])],
+    "Audit Log": data.auditLog.map(a => [a.id, iso(a.timestamp), a.actor || "", a.action || "", a.entityType || "", a.entityId || "", a.detail || ""]),
+    Notifications: data.notifications.map(n => [n.id, n.to || "", n.channel || "", n.message || "", "queued", iso(n.timestamp), ""]),
+  };
+}
+
+async function googleRequest(path, token, options = {}) {
+  const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}${path}`, {
+    ...options,
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(options.headers || {}) },
+  });
+  if (!response.ok) throw new Error(`Google Sheets returned ${response.status}.`);
+  return response.json();
+}
+
+async function loadGoogleData(token) {
+  const range = encodeURIComponent("'Portal State'!A1");
+  const result = await googleRequest(`/values/${range}`, token);
+  const saved = result.values?.[0]?.[0];
+  return saved ? JSON.parse(saved) : null;
+}
+
+async function saveGoogleData(data, token) {
+  const rows = sheetRows(data);
+  await googleRequest("/values:batchClear", token, {
+    method: "POST",
+    body: JSON.stringify({ ranges: ["Residents!A2:Q1000", "'Check-Ins'!A2:H1000", "'Overnight Requests'!A2:J1000", "'Program Settings'!A2:C1000", "'Audit Log'!A2:G2001", "Notifications!A2:G2001"] }),
+  });
+  const updates = [{ range: "'Portal State'!A1", values: [[JSON.stringify(data)]] }];
+  for (const [name, values] of Object.entries(rows)) if (values.length) updates.push({ range: `'${name}'!A2`, values });
+  await googleRequest("/values:batchUpdate", token, {
+    method: "POST",
+    body: JSON.stringify({ valueInputOption: "RAW", data: updates }),
+  });
+}
+
 function daysBetween(a, b) {
   return Math.floor((b - a) / 86400000);
 }
@@ -73,6 +156,9 @@ export default function App() {
   const [error, setError] = useState(null);
   const [role, setRole] = useState(null); // 'resident' | 'manager' | 'owner' | 'intake'
   const [residentId, setResidentId] = useState(null);
+  const [googleAccessToken, setGoogleAccessToken] = useState(null);
+  const [googleUser, setGoogleUser] = useState(null);
+  const [syncStatus, setSyncStatus] = useState("Not connected");
 
   useEffect(() => {
     (async () => {
@@ -98,10 +184,47 @@ export default function App() {
     setData(next);
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      if (googleAccessToken) {
+        setSyncStatus("Saving to Google Sheets…");
+        await saveGoogleData(next, googleAccessToken);
+        setSyncStatus("Saved to Google Sheets");
+      }
     } catch {
-      setError("Changes are showing but couldn't be saved. Try again in a moment.");
+      setSyncStatus("Google Sheets needs attention");
+      setError("Changes are showing on this device, but Google Sheets could not save them. Reconnect Google and try again.");
     }
-  }, []);
+  }, [googleAccessToken]);
+
+  const connectGoogle = useCallback(async () => {
+    setError(null);
+    setSyncStatus("Connecting to Google…");
+    try {
+      await loadGoogleIdentity();
+      const token = await requestGoogleToken();
+      const profileResponse = await fetch("https://openidconnect.googleapis.com/v1/userinfo", { headers: { Authorization: `Bearer ${token}` } });
+      if (!profileResponse.ok) throw new Error("Google could not verify this account.");
+      const profile = await profileResponse.json();
+      if ((profile.email || "").toLowerCase() !== GOOGLE_OWNER_EMAIL) {
+        window.google.accounts.oauth2.revoke(token);
+        throw new Error(`Access is restricted to ${GOOGLE_OWNER_EMAIL}.`);
+      }
+      const saved = await loadGoogleData(token);
+      if (saved) {
+        setData(saved);
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+      } else {
+        await saveGoogleData(data, token);
+      }
+      setGoogleAccessToken(token);
+      setGoogleUser(profile.email);
+      setSyncStatus("Connected to Google Sheets");
+    } catch (e) {
+      setGoogleAccessToken(null);
+      setGoogleUser(null);
+      setSyncStatus("Not connected");
+      setError(e?.message || "Google Sheets could not be connected.");
+    }
+  }, [data]);
 
   const addAudit = (draft, actor, action, detail) => {
     draft.auditLog = [
@@ -156,17 +279,34 @@ export default function App() {
             setResidentId={setResidentId}
           />
         )}
-        {(role === "manager" || role === "owner") && (
+        {(role === "manager" || role === "owner") && !googleAccessToken && (
+          <GoogleSheetAccess onConnect={connectGoogle} status={syncStatus} />
+        )}
+        {(role === "manager" || role === "owner") && googleAccessToken && (
           <ManagerView
             data={data}
             persist={persist}
             addAudit={addAudit}
             addNotification={addNotification}
             readOnly={role === "owner"}
+            googleUser={googleUser}
+            syncStatus={syncStatus}
           />
         )}
       </div>
     </div>
+  );
+}
+
+function GoogleSheetAccess({ onConnect, status }) {
+  return (
+    <Panel title="Owner verification required" subtitle="Resident records and approval tools are restricted to the authorized Ashrei Impact Foundation Google account.">
+      <div style={{ background: theme.primarySoft, borderRadius: 10, padding: "0.9rem 1rem", marginBottom: 14, fontSize: 13, lineHeight: 1.6 }}>
+        Sign in as <strong>{GOOGLE_OWNER_EMAIL}</strong> to open the management workspace and synchronize changes with the private Google Sheet.
+      </div>
+      <button onClick={onConnect} style={btnPrimary}><ShieldCheck size={16} /> Connect Google Sheet</button>
+      <div style={{ marginTop: 10, fontSize: 12, color: theme.inkSoft }}>{status}</div>
+    </Panel>
   );
 }
 
@@ -508,7 +648,7 @@ function OvernightPanel({ tenant, data, persist, addAudit, eligibleForOvernight,
 
 /* ---------------- MANAGER / OWNER VIEW ---------------- */
 
-function ManagerView({ data, persist, addAudit, addNotification, readOnly }) {
+function ManagerView({ data, persist, addAudit, addNotification, readOnly, googleUser, syncStatus }) {
   const [tab, setTab] = useState(readOnly ? "reports" : "today");
   const tabs = readOnly
     ? [["reports", "Reports"]]
@@ -516,6 +656,10 @@ function ManagerView({ data, persist, addAudit, addNotification, readOnly }) {
 
   return (
     <div>
+      <div style={{ background: theme.primarySoft, border: `1px solid ${theme.primary}22`, borderRadius: 10, padding: "0.7rem 0.85rem", marginBottom: 14, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", fontSize: 13 }}>
+        <span><strong>Google Sheets connected</strong> · {googleUser}<br /><span style={{ color: theme.inkSoft }}>{syncStatus}</span></span>
+        <a href={`https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/edit`} target="_blank" rel="noreferrer" style={{ color: theme.primary, fontWeight: 600 }}>Open private Sheet</a>
+      </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 18, flexWrap: "wrap" }}>
         {tabs.map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)} style={tab === key ? tabActive : tabInactive}>{label}</button>
