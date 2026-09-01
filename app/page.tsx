@@ -346,7 +346,7 @@ function Landing({ setRole, setResidentId, data }) {
         {activeCount > 0 && ` ${activeCount} active resident${activeCount === 1 ? "" : "s"}.`}
       </p>
       <div className="role-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        <RoleCard icon={<LogIn size={20} />} title="I'm a resident" desc="Check in or out, request an overnight, view my status" onClick={() => setRole("resident")} />
+        <RoleCard icon={<LogIn size={20} />} title="I'm a resident" desc="Submit an overnight request for program-team approval" onClick={() => setRole("resident")} />
         <RoleCard icon={<PenLine size={20} />} title="New resident intake" desc="Complete your residency agreement and program commitments" onClick={() => setRole("intake")} accent />
       </div>
     </div>
@@ -479,23 +479,7 @@ function ResidentView({ data, persist, addAudit, addNotification, residentId, se
 
   if (!tenant) {
     return (
-      <Panel title="Who are you?" subtitle="Pick your name to continue.">
-        {active.length === 0 ? (
-          <EmptyState text="No residents on file yet. Use New resident intake from the home screen first." />
-        ) : (
-          <div style={{ display: "grid", gap: 8 }}>
-            {active.map(t => (
-              <button key={t.id} onClick={() => setResidentId(t.id)} style={{ ...listRow, cursor: "pointer" }}>
-                <span>
-                  <span style={{ fontWeight: 500, display: "block" }}>{t.name}</span>
-                  <span style={{ fontSize: 12, color: theme.inkSoft }}>{t.room && t.bed ? `Room ${t.room} · Bed ${t.bed}` : "Room and bed not assigned"}</span>
-                </span>
-                <ArrowRight size={15} color={theme.inkSoft} />
-              </button>
-            ))}
-          </div>
-        )}
-      </Panel>
+      <ResidentOvernightRequest />
     );
   }
 
@@ -697,6 +681,34 @@ function TodayTab({ data }) {
       </Panel>
     </div>
   );
+}
+
+function ResidentOvernightRequest() {
+  const [form, setForm] = useState({ name: "", phone: "", requestedDate: "", returnDate: "", reason: "" });
+  const [consent, setConsent] = useState(false);
+  const [status, setStatus] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const canSubmit = form.name && form.phone && form.requestedDate && form.returnDate && consent;
+  const submit = async () => {
+    setSubmitting(true); setStatus("");
+    try {
+      const response = await fetch("/api/public-submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "overnight", ...form, consentDrugTest: consent }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Your request could not be submitted.");
+      setStatus("Your overnight request was submitted for program-team approval.");
+      setForm({ name: "", phone: "", requestedDate: "", returnDate: "", reason: "" }); setConsent(false);
+    } catch (error) { setStatus(error.message || "Your request could not be submitted."); }
+    finally { setSubmitting(false); }
+  };
+  return <Panel title="Overnight stay request" subtitle="Your request is reviewed by the program team before it is approved.">
+    <Field label="Full name"><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={input} /></Field>
+    <Field label="Phone number"><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} style={input} /></Field>
+    <div className="two-col-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}><Field label="Leaving"><input type="date" value={form.requestedDate} onChange={e => setForm({ ...form, requestedDate: e.target.value })} style={input} /></Field><Field label="Returning"><input type="date" value={form.returnDate} onChange={e => setForm({ ...form, returnDate: e.target.value })} style={input} /></Field></div>
+    <Field label="Reason (optional)"><input value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} style={input} /></Field>
+    <CheckField label="I consent to a drug test upon my return from this trip" checked={consent} onChange={setConsent} />
+    <button disabled={!canSubmit || submitting} onClick={submit} style={canSubmit && !submitting ? btnPrimary : btnDisabled}>{submitting ? "Submitting…" : "Submit request"}</button>
+    {status && <p style={{ color: theme.inkSoft, fontSize: 13, marginTop: 12 }}>{status}</p>}
+  </Panel>;
 }
 
 function AssignmentsTab({ data, persist, addAudit }) {
