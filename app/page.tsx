@@ -819,6 +819,12 @@ function MaintenanceRequest() {
 
 function AssignmentsTab({ data, persist, addAudit }) {
   const active = data.tenants.filter(t => t.active);
+  const totalBeds = 8;
+  const assignedBeds = active.filter(t => t.room && t.bed).length;
+  const roomBedCounts = active.reduce((counts, t) => {
+    if (t.room && t.bed) counts[t.room.trim().toLowerCase()] = (counts[t.room.trim().toLowerCase()] || 0) + 1;
+    return counts;
+  }, {});
   const [assignments, setAssignments] = useState(() => Object.fromEntries(active.map(t => [t.id, { room: t.room || "", bed: t.bed || "" }])));
   const [message, setMessage] = useState("");
 
@@ -835,6 +841,12 @@ function AssignmentsTab({ data, persist, addAudit }) {
       setMessage(`Room ${room}, Bed ${bed} is already assigned to ${conflict.name}.`);
       return;
     }
+    const roomCount = roomBedCounts[room.toLowerCase()] || 0;
+    const currentRoom = (tenant.room || "").trim().toLowerCase();
+    if (currentRoom !== room.toLowerCase() && roomCount >= 2) {
+      setMessage(`Room ${room} is already at its two-bed capacity.`);
+      return;
+    }
     const next = JSON.parse(JSON.stringify(data));
     const record = next.tenants.find(t => t.id === tenant.id);
     record.room = room;
@@ -845,7 +857,12 @@ function AssignmentsTab({ data, persist, addAudit }) {
   };
 
   return (
-    <Panel title="Room and bed assignments" subtitle="Assign each active resident to a specific room and bed. Duplicate assignments are blocked.">
+    <Panel title="Room and bed assignments" subtitle="Four rooms with two beds each. Duplicate assignments and rooms over two residents are blocked.">
+      <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
+        <StatCard label="Total beds" value={totalBeds} />
+        <StatCard label="Occupied beds" value={assignedBeds} />
+        <StatCard label="Available beds" value={Math.max(0, totalBeds - assignedBeds)} tone="amber" />
+      </div>
       {message && <div role="status" style={{ background: theme.primarySoft, color: theme.primary, padding: "0.65rem 0.8rem", borderRadius: 8, fontSize: 13, marginBottom: 12 }}>{message}</div>}
       {active.length === 0 ? <EmptyState text="No active residents yet." /> : (
         <div style={{ display: "grid", gap: 10 }}>
