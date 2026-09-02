@@ -324,7 +324,7 @@ function Header({ role, setRole, setResidentId }) {
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, paddingTop: 4 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: role ? "pointer" : "default" }}
            onClick={() => { if (role) { setRole(null); setResidentId(null); } }}>
-        <img src="/ashrei-impact-logo.png" alt="Ashrei Impact Foundation" style={{ width: 52, height: 52, objectFit: "contain", borderRadius: 8 }} />
+        <img src="/ashrei-impact-logo.svg" alt="Ashrei Impact Foundation" style={{ width: 52, height: 52, objectFit: "contain", borderRadius: 8 }} />
         <div>
           <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 19 }}>Ashrei Impact Foundation</div>
           <div style={{ fontSize: 10, color: theme.inkSoft, letterSpacing: "0.08em", textTransform: "uppercase" }}>Resident care portal</div>
@@ -1186,4 +1186,4 @@ const btnSmallPrimary = { ...btnBase, background: theme.accent, color: "#fff", p
 const btnSmallDanger = { ...btnBase, background: theme.redSoft, color: theme.red, padding: "0.4rem 0.6rem" };
 const tabActive = { ...btnBase, background: theme.primary, color: "#fff", padding: "0.4rem 0.8rem" };
 const tabInactive = { ...btnBase, background: "transparent", color: theme.inkSoft, padding: "0.4rem 0.8rem", border: `1px solid ${theme.border}` };
-
+
