@@ -7,6 +7,19 @@ export default async function handler(req, res) {
   if (req.method !== "POST") { res.setHeader("Allow", "POST"); return res.status(405).json({ error: "Method not allowed." }); }
   try {
     const body = req.body || {};
+    if (body.type === "maintenance") {
+      const name = clean(body.name), phone = clean(body.phone), location = clean(body.location), description = clean(body.description);
+      if (!name || !phone || !location || !description) return res.status(400).json({ error: "Please complete the required maintenance request fields." });
+      const data = (await readState()) || structuredClone(EMPTY_STATE);
+      const tenant = data.tenants.find(t => t.active && t.name.toLowerCase() === name.toLowerCase() && t.phone.replace(/\D/g, "").slice(-4) === phone.replace(/\D/g, "").slice(-4));
+      if (!tenant) return res.status(400).json({ error: "We could not verify an active resident using that name and phone number. Please contact the program coordinator." });
+      const createdAt = Date.now();
+      data.maintenance = data.maintenance || [];
+      data.maintenance.unshift({ id: id(), tenantId: tenant.id, location, priority: clean(body.priority) || "routine", description, status: "reported", createdAt });
+      data.auditLog.unshift({ id: id(), timestamp: createdAt, actor: tenant.name, action: "maintenance_reported", detail: `${location}: ${description}` });
+      await writeState(data);
+      return res.status(201).json({ ok: true });
+    }
     if (body.type === "overnight") {
       const name = clean(body.name), phone = clean(body.phone), requestedDate = clean(body.requestedDate), returnDate = clean(body.returnDate);
       if (!name || !phone || !requestedDate || !returnDate || !body.consentDrugTest) return res.status(400).json({ error: "Please complete every required overnight-request field." });
