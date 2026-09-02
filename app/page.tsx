@@ -480,6 +480,7 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
           <li>Conduct that disrupts another resident's stay or the shared living environment will result in removal from the residence.</li>
           <li>All payments are non-refundable.</li>
           <li>A $150 administrative fee is required and is non-refundable.</li>
+          <li>Funds must be paid by cash, business check made payable to Ashrei Impact Foundation, or an online payment platform once provided by the program.</li>
         </ul>
       </div>
       <CheckField label="I have read, understand, and agree to the occupancy and payment terms above" checked={agreeOccupancyTerms} onChange={setAgreeOccupancyTerms} />
