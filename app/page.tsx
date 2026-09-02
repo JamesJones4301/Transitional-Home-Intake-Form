@@ -8,6 +8,10 @@ import {
   Clock, ShieldCheck, TrendingUp, PenLine, Moon, ArrowRight
 } from "lucide-react";
 
+declare global {
+  interface Window { google?: any; }
+}
+
 const STORAGE_KEY = "ashrei-impact-resident-care";
 const GOOGLE_CLIENT_ID = "763224714860-t1srggj7a6jp14iceh40c1c0g6gcf87h.apps.googleusercontent.com";
 const GOOGLE_SHEET_ID = "13yiU4efcTMpriA10i4_xS50gIlAN4tbAi6BaF9StKH0";
