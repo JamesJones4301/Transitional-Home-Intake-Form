@@ -4,7 +4,7 @@ const SPREADSHEET_ID = "13yiU4efcTMpriA10i4_xS50gIlAN4tbAi6BaF9StKH0";
 const OWNER_EMAIL = "ashreiimpactfoundation@gmail.com";
 const EMPTY_STATE = {
   tenants: [], checkins: [], requests: [],
-  maintenance: [],
+  maintenance: [], dailyReports: [], incidentReports: [],
   settings: { curfews: { 0: "23:00", 1: "21:00", 2: "21:00", 3: "21:00", 4: "21:00", 5: "23:00", 6: "23:00" }, managerName: "Program coordinator", managerPhone: "" },
   auditLog: [], notifications: [],
 };
