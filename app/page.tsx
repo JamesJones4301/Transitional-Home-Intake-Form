@@ -44,6 +44,7 @@ function defaultData() {
   const now = Date.now();
   return {
     tenants: [], checkins: [], requests: [],
+    maintenance: [],
     settings: { curfews: { ...DEFAULT_CURFEWS }, managerName: "Program coordinator", managerPhone: "" },
     auditLog: [],
     notifications: [],
@@ -379,18 +380,20 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
   const [agreeOccupancyTerms, setAgreeOccupancyTerms] = useState(false);
   const [agreeProgramStandards, setAgreeProgramStandards] = useState(false);
   const [agreeMoveInHygiene, setAgreeMoveInHygiene] = useState(false);
+  const [screening, setScreening] = useState({ independentLiving: "", legalOrSupervision: "", treatmentSupport: "", registryRequirement: "", concerns: "" });
+  const [screeningAccurate, setScreeningAccurate] = useState(false);
   const [consentTest, setConsentTest] = useState(false);
   const [signature, setSignature] = useState("");
   const [done, setDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const canSubmit = form.name && form.phone && form.room && form.bed && agreeLease && agreeRules && agreeOccupancyTerms && agreeProgramStandards && agreeMoveInHygiene &&
+  const canSubmit = form.name && form.phone && form.room && form.bed && agreeLease && agreeRules && agreeOccupancyTerms && agreeProgramStandards && agreeMoveInHygiene && screening.independentLiving && screening.legalOrSupervision && screening.treatmentSupport && screening.registryRequirement && screeningAccurate &&
     signature.trim().toLowerCase() === form.name.trim().toLowerCase() && signature.trim().length > 1;
 
   const submit = async () => {
     setSubmitting(true);
     try {
-      const response = await fetch("/api/public-submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "intake", ...form, consentDrugTest: consentTest, agreementAccepted: true, programStandardsAccepted: agreeProgramStandards, moveInHygieneAccepted: agreeMoveInHygiene }) });
+      const response = await fetch("/api/public-submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "intake", ...form, consentDrugTest: consentTest, agreementAccepted: true, programStandardsAccepted: agreeProgramStandards, moveInHygieneAccepted: agreeMoveInHygiene, screening, screeningAccurate }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Your application could not be submitted.");
       setDone(true);
@@ -448,6 +451,27 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
       </div>
       <CheckField label="I have read and agree to the residency terms" checked={agreeLease} onChange={setAgreeLease} />
       <CheckField label="I have read and agree to the community commitments" checked={agreeRules} onChange={setAgreeRules} />
+
+      <div style={{ background: theme.bg, border: `1px solid ${theme.border}`, borderRadius: 10, padding: "0.95rem 1rem", margin: "1rem 0", fontSize: 13, lineHeight: 1.55 }}>
+        <strong style={{ display: "block", marginBottom: 8 }}>Screening and support information</strong>
+        <p style={{ margin: "0 0 12px", color: theme.inkSoft }}>These answers help the program team review whether this shared-living setting is appropriate. They do not replace a full review or emergency assessment.</p>
+        <Field label="Can you live independently without 24-hour medical or clinical supervision?">
+          <select value={screening.independentLiving} onChange={e => setScreening({ ...screening, independentLiving: e.target.value })} style={input}><option value="">Select an answer</option><option>Yes</option><option>No</option></select>
+        </Field>
+        <Field label="Are you currently on probation, parole, or another form of legal supervision?">
+          <select value={screening.legalOrSupervision} onChange={e => setScreening({ ...screening, legalOrSupervision: e.target.value })} style={input}><option value="">Select an answer</option><option>Yes</option><option>No</option></select>
+        </Field>
+        <Field label="Are you currently receiving treatment, counseling, or recovery support services?">
+          <select value={screening.treatmentSupport} onChange={e => setScreening({ ...screening, treatmentSupport: e.target.value })} style={input}><option value="">Select an answer</option><option>Yes</option><option>No</option></select>
+        </Field>
+        <Field label="Are you currently required to register as a sex offender?">
+          <select value={screening.registryRequirement} onChange={e => setScreening({ ...screening, registryRequirement: e.target.value })} style={input}><option value="">Select an answer</option><option>Yes</option><option>No</option></select>
+        </Field>
+        <Field label="Safety, legal, medical, behavioral, medication, or housing concerns the program team should review (optional)">
+          <textarea value={screening.concerns} onChange={e => setScreening({ ...screening, concerns: e.target.value })} style={{ ...input, minHeight: 76, resize: "vertical" }} placeholder="Share only information relevant to your housing review." />
+        </Field>
+      </div>
+      <CheckField label="I certify that my screening answers are complete and accurate, and I will promptly update the program team if they change" checked={screeningAccurate} onChange={setScreeningAccurate} />
 
       <div style={{ background: theme.amberSoft, border: `1px solid ${theme.amber}33`, borderRadius: 10, padding: "0.95rem 1rem", margin: "1rem 0", fontSize: 13, color: theme.ink, lineHeight: 1.6 }}>
         <strong style={{ display: "block", marginBottom: 6 }}>Important occupancy and payment terms</strong>
@@ -1162,4 +1186,4 @@ const btnSmallPrimary = { ...btnBase, background: theme.accent, color: "#fff", p
 const btnSmallDanger = { ...btnBase, background: theme.redSoft, color: theme.red, padding: "0.4rem 0.6rem" };
 const tabActive = { ...btnBase, background: theme.primary, color: "#fff", padding: "0.4rem 0.8rem" };
 const tabInactive = { ...btnBase, background: "transparent", color: theme.inkSoft, padding: "0.4rem 0.8rem", border: `1px solid ${theme.border}` };
-
+
