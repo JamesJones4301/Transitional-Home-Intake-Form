@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   Home, LogIn, LogOut, Calendar, Check, X, FileText, Bell,
   ClipboardList, Users, Settings, Send, AlertCircle, ChevronLeft,
-  Clock, ShieldCheck, TrendingUp, PenLine, Moon, ArrowRight
+  Clock, ShieldCheck, TrendingUp, PenLine, Moon, ArrowRight, Wrench
 } from "lucide-react";
 
 declare global {
@@ -323,9 +323,7 @@ function Header({ role, setRole, setResidentId }) {
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, paddingTop: 4 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: role ? "pointer" : "default" }}
            onClick={() => { if (role) { setRole(null); setResidentId(null); } }}>
-        <div style={{ width: 34, height: 34, borderRadius: 8, background: theme.primary, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Home size={18} color="#fff" />
-        </div>
+        <img src="/ashrei-impact-logo.png" alt="Ashrei Impact Foundation" style={{ width: 52, height: 52, objectFit: "contain", borderRadius: 8 }} />
         <div>
           <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 19 }}>Ashrei Impact Foundation</div>
           <div style={{ fontSize: 10, color: theme.inkSoft, letterSpacing: "0.08em", textTransform: "uppercase" }}>Resident care portal</div>
@@ -379,18 +377,20 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
   const [agreeLease, setAgreeLease] = useState(false);
   const [agreeRules, setAgreeRules] = useState(false);
   const [agreeOccupancyTerms, setAgreeOccupancyTerms] = useState(false);
+  const [agreeProgramStandards, setAgreeProgramStandards] = useState(false);
+  const [agreeMoveInHygiene, setAgreeMoveInHygiene] = useState(false);
   const [consentTest, setConsentTest] = useState(false);
   const [signature, setSignature] = useState("");
   const [done, setDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const canSubmit = form.name && form.phone && form.room && form.bed && agreeLease && agreeRules && agreeOccupancyTerms &&
+  const canSubmit = form.name && form.phone && form.room && form.bed && agreeLease && agreeRules && agreeOccupancyTerms && agreeProgramStandards && agreeMoveInHygiene &&
     signature.trim().toLowerCase() === form.name.trim().toLowerCase() && signature.trim().length > 1;
 
   const submit = async () => {
     setSubmitting(true);
     try {
-      const response = await fetch("/api/public-submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "intake", ...form, consentDrugTest: consentTest, agreementAccepted: true }) });
+      const response = await fetch("/api/public-submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "intake", ...form, consentDrugTest: consentTest, agreementAccepted: true, programStandardsAccepted: agreeProgramStandards, moveInHygieneAccepted: agreeMoveInHygiene }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Your application could not be submitted.");
       setDone(true);
@@ -459,6 +459,16 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
         </ul>
       </div>
       <CheckField label="I have read, understand, and agree to the occupancy and payment terms above" checked={agreeOccupancyTerms} onChange={setAgreeOccupancyTerms} />
+      <div style={{ background: theme.primarySoft, borderRadius: 10, padding: "0.95rem 1rem", margin: "1rem 0", fontSize: 13, lineHeight: 1.6 }}>
+        <strong style={{ display: "block", marginBottom: 6 }}>Program standards acknowledgment</strong>
+        I understand this is a clean and sober, faith-centered shared living environment. I agree to comply with sober-living safety rules, mandatory and random drug/alcohol testing, curfew and pre-approved overnight requirements, visitor limits, resident privacy, maintenance reporting, and the grievance process. I understand serious or repeated unsafe conduct may result in corrective action or program discharge, subject to applicable law and program policy.
+      </div>
+      <CheckField label="I have reviewed and agree to the House Rules, safety standards, testing, curfew/overnight, visitor, maintenance, grievance, privacy, and program-discharge policies" checked={agreeProgramStandards} onChange={setAgreeProgramStandards} />
+      <div style={{ background: theme.accentSoft, borderRadius: 10, padding: "0.95rem 1rem", margin: "1rem 0", fontSize: 13, lineHeight: 1.6 }}>
+        <strong style={{ display: "block", marginBottom: 6 }}>Required before entering your assigned room</strong>
+        All washable clothing and fabric items must be placed directly into laundry and washed/dried as directed with the program-provided bedbug laundry detergent/additive before entering the bedroom or storage area. You must also shower before settling into your assigned room and report any suspected pest concern immediately.
+      </div>
+      <CheckField label="I understand and will complete the required laundry and shower procedure before entering my room" checked={agreeMoveInHygiene} onChange={setAgreeMoveInHygiene} />
       <CheckField label="I consent to being drug tested, including upon return from any approved overnight stay" checked={consentTest} onChange={setConsentTest} />
 
       <Field label="Type your full name as your signature">
@@ -624,7 +634,7 @@ function ManagerView({ data, persist, addAudit, addNotification, readOnly, googl
   const [tab, setTab] = useState(readOnly ? "reports" : "today");
   const tabs = readOnly
     ? [["reports", "Reports"]]
-    : [["today", "Today"], ["intakes", "Intake approvals"], ["assignments", "Rooms & beds"], ["requests", "Overnight requests"], ["reports", "Reports"], ["comms", "Notifications"], ["settings", "Settings"]];
+    : [["today", "Today"], ["intakes", "Intake approvals"], ["assignments", "Rooms & beds"], ["requests", "Overnight requests"], ["maintenance", "Maintenance"], ["reports", "Reports"], ["comms", "Notifications"], ["settings", "Settings"]];
 
   return (
     <div>
@@ -641,6 +651,7 @@ function ManagerView({ data, persist, addAudit, addNotification, readOnly, googl
       {tab === "intakes" && <IntakeApprovalsTab data={data} persist={persist} addAudit={addAudit} addNotification={addNotification} />}
       {tab === "assignments" && <AssignmentsTab data={data} persist={persist} addAudit={addAudit} />}
       {tab === "requests" && <RequestsTab data={data} persist={persist} addAudit={addAudit} addNotification={addNotification} />}
+      {tab === "maintenance" && <MaintenanceTab data={data} />}
       {tab === "reports" && <ReportsTab data={data} />}
       {tab === "comms" && <CommsTab data={data} persist={persist} addAudit={addAudit} addNotification={addNotification} />}
       {tab === "settings" && <SettingsTab data={data} persist={persist} addAudit={addAudit} />}
@@ -687,6 +698,13 @@ function TodayTab({ data }) {
   );
 }
 
+function MaintenanceTab({ data }) {
+  const requests = (data.maintenance || []).sort((a, b) => b.createdAt - a.createdAt);
+  return <Panel title="Maintenance requests" subtitle="Emergency issues should be handled immediately; residents must not attempt unauthorized repairs.">
+    {requests.length === 0 ? <EmptyState text="No maintenance requests have been submitted." /> : <div style={{ display: "grid", gap: 8 }}>{requests.map(r => <div key={r.id} style={{ ...listRow, alignItems: "flex-start", flexDirection: "column", gap: 4 }}><strong>{r.priority.toUpperCase()} · {r.location}</strong><span>{r.description}</span><span style={{ fontSize: 12, color: theme.inkSoft }}>{fmtTime(r.createdAt)} · Status: {r.status}</span></div>)}</div>}
+  </Panel>;
+}
+
 function ResidentOvernightRequest() {
   const [form, setForm] = useState({ name: "", phone: "", requestedDate: "", returnDate: "", reason: "" });
   const [consent, setConsent] = useState(false);
@@ -704,13 +722,34 @@ function ResidentOvernightRequest() {
     } catch (error) { setStatus(error.message || "Your request could not be submitted."); }
     finally { setSubmitting(false); }
   };
-  return <Panel title="Overnight stay request" subtitle="Your request is reviewed by the program team before it is approved.">
+  return <><Panel title="Overnight stay request" subtitle="Your request is reviewed by the program team before it is approved.">
     <Field label="Full name"><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={input} /></Field>
     <Field label="Phone number"><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} style={input} /></Field>
     <div className="two-col-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}><Field label="Leaving"><input type="date" value={form.requestedDate} onChange={e => setForm({ ...form, requestedDate: e.target.value })} style={input} /></Field><Field label="Returning"><input type="date" value={form.returnDate} onChange={e => setForm({ ...form, returnDate: e.target.value })} style={input} /></Field></div>
     <Field label="Reason (optional)"><input value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} style={input} /></Field>
     <CheckField label="I consent to a drug test upon my return from this trip" checked={consent} onChange={setConsent} />
     <button disabled={!canSubmit || submitting} onClick={submit} style={canSubmit && !submitting ? btnPrimary : btnDisabled}>{submitting ? "Submitting…" : "Submit request"}</button>
+    {status && <p style={{ color: theme.inkSoft, fontSize: 13, marginTop: 12 }}>{status}</p>}
+  </Panel><MaintenanceRequest /></>;
+}
+
+function MaintenanceRequest() {
+  const [form, setForm] = useState({ name: "", phone: "", location: "", priority: "routine", description: "" });
+  const [status, setStatus] = useState("");
+  const submit = async () => {
+    setStatus("Submitting…");
+    const response = await fetch("/api/public-submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "maintenance", ...form }) });
+    const result = await response.json();
+    setStatus(response.ok ? "Maintenance request submitted. Do not attempt repairs yourself. For an emergency, contact the house manager or emergency services immediately." : (result.error || "Request could not be submitted."));
+  };
+  const ready = form.name && form.phone && form.location && form.description;
+  return <Panel title="Maintenance request" subtitle="Report leaks, electrical hazards, lock failures, sewage backup, fire/smoke, or other property concerns promptly.">
+    <Field label="Full name"><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={input} /></Field>
+    <Field label="Phone number"><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} style={input} /></Field>
+    <Field label="Location of issue"><input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} style={input} placeholder="Room 201, bathroom" /></Field>
+    <Field label="Priority"><select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })} style={input}><option value="emergency">Emergency</option><option value="urgent">Urgent</option><option value="routine">Routine</option></select></Field>
+    <Field label="Describe the problem"><textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} style={{ ...input, minHeight: 80 }} /></Field>
+    <button disabled={!ready} onClick={submit} style={ready ? btnPrimary : btnDisabled}><Wrench size={15} style={{ marginRight: 6, verticalAlign: -2 }} />Submit maintenance request</button>
     {status && <p style={{ color: theme.inkSoft, fontSize: 13, marginTop: 12 }}>{status}</p>}
   </Panel>;
 }
