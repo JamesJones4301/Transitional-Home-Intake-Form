@@ -44,7 +44,7 @@ function defaultData() {
   const now = Date.now();
   return {
     tenants: [], checkins: [], requests: [],
-    maintenance: [],
+    maintenance: [], dailyReports: [], incidentReports: [],
     settings: { curfews: { ...DEFAULT_CURFEWS }, managerName: "Program coordinator", managerPhone: "" },
     auditLog: [],
     notifications: [],
@@ -168,7 +168,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("owner") === "1") setRole("ownerMenu");
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("owner") === "1") setRole("ownerMenu");
+    if (params.get("manager") === "1") setRole("houseManager");
   }, []);
 
   const persist = useCallback(async (next) => {
@@ -270,6 +272,7 @@ export default function App() {
             setResidentId={setResidentId}
           />
         )}
+        {role === "houseManager" && <HouseManagerPortal />}
         {role === "ownerMenu" && !googleAccessToken && (
           <GoogleSheetAccess onConnect={connectGoogle} status={syncStatus} />
         )}
@@ -659,7 +662,7 @@ function ManagerView({ data, persist, addAudit, addNotification, readOnly, googl
   const [tab, setTab] = useState(readOnly ? "reports" : "today");
   const tabs = readOnly
     ? [["reports", "Reports"]]
-    : [["today", "Today"], ["intakes", "Intake approvals"], ["assignments", "Rooms & beds"], ["requests", "Overnight requests"], ["maintenance", "Maintenance"], ["reports", "Reports"], ["comms", "Notifications"], ["settings", "Settings"]];
+    : [["today", "Today"], ["intakes", "Intake approvals"], ["assignments", "Rooms & beds"], ["requests", "Overnight requests"], ["maintenance", "Maintenance"], ["houseReports", "House reports"], ["reports", "Reports"], ["comms", "Notifications"], ["settings", "Settings"]];
 
   return (
     <div>
@@ -677,6 +680,7 @@ function ManagerView({ data, persist, addAudit, addNotification, readOnly, googl
       {tab === "assignments" && <AssignmentsTab data={data} persist={persist} addAudit={addAudit} />}
       {tab === "requests" && <RequestsTab data={data} persist={persist} addAudit={addAudit} addNotification={addNotification} />}
       {tab === "maintenance" && <MaintenanceTab data={data} />}
+      {tab === "houseReports" && <HouseReportsTab data={data} />}
       {tab === "reports" && <ReportsTab data={data} />}
       {tab === "comms" && <CommsTab data={data} persist={persist} addAudit={addAudit} addNotification={addNotification} />}
       {tab === "settings" && <SettingsTab data={data} persist={persist} addAudit={addAudit} />}
@@ -728,6 +732,32 @@ function MaintenanceTab({ data }) {
   return <Panel title="Maintenance requests" subtitle="Emergency issues should be handled immediately; residents must not attempt unauthorized repairs.">
     {requests.length === 0 ? <EmptyState text="No maintenance requests have been submitted." /> : <div style={{ display: "grid", gap: 8 }}>{requests.map(r => <div key={r.id} style={{ ...listRow, alignItems: "flex-start", flexDirection: "column", gap: 4 }}><strong>{r.priority.toUpperCase()} · {r.location}</strong><span>{r.description}</span><span style={{ fontSize: 12, color: theme.inkSoft }}>{fmtTime(r.createdAt)} · Status: {r.status}</span></div>)}</div>}
   </Panel>;
+}
+
+function HouseReportsTab({ data }) {
+  const daily = (data.dailyReports || []).sort((a, b) => b.createdAt - a.createdAt);
+  const incidents = (data.incidentReports || []).sort((a, b) => b.createdAt - a.createdAt);
+  const ReportRows = ({ reports, empty }) => reports.length === 0 ? <EmptyState text={empty} /> : <div style={{ display: "grid", gap: 8 }}>{reports.map(r => <div key={r.id} style={{ ...listRow, alignItems: "flex-start", flexDirection: "column", gap: 4 }}><strong>{r.managerName} · {fmtTime(r.createdAt)}</strong><span style={{ whiteSpace: "pre-wrap" }}>{r.summary}</span>{r.residents && <span style={{ fontSize: 12, color: theme.inkSoft }}>Residents involved: {r.residents}</span>}</div>)}</div>;
+  return <div><Panel title="Daily reports" subtitle="Submitted by the House Manager for Owner review."><ReportRows reports={daily} empty="No daily reports submitted." /></Panel><Panel title="Incident reports" subtitle="Document facts, actions taken, and items requiring Owner follow-up."><ReportRows reports={incidents} empty="No incident reports submitted." /></Panel></div>;
+}
+
+function HouseManagerPortal() {
+  const [tab, setTab] = useState("daily");
+  const [code, setCode] = useState("");
+  const [form, setForm] = useState({ managerName: "", residents: "", summary: "", actionTaken: "" });
+  const [status, setStatus] = useState("");
+  const submit = async () => {
+    setStatus("Submitting…");
+    try {
+      const response = await fetch("/api/public-submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: tab === "daily" ? "manager-daily" : "manager-incident", accessCode: code, ...form }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Report could not be submitted.");
+      setStatus("Report sent securely to the Owner workspace.");
+      setForm({ managerName: form.managerName, residents: "", summary: "", actionTaken: "" });
+    } catch (error) { setStatus(error.message || "Report could not be submitted."); }
+  };
+  const ready = code && form.managerName && form.summary;
+  return <div><div style={{ display: "flex", gap: 8, marginBottom: 16 }}><button onClick={() => setTab("daily")} style={tab === "daily" ? tabActive : tabInactive}>Daily report</button><button onClick={() => setTab("incident")} style={tab === "incident" ? tabActive : tabInactive}>Incident report</button></div><Panel title={tab === "daily" ? "House Manager daily report" : "House Manager incident report"} subtitle="This private submission goes directly to the Owner workspace. Do not include information that is not necessary for program follow-up."><Field label="House Manager access code"><input type="password" value={code} onChange={e => setCode(e.target.value)} style={input} /></Field><Field label="Your name"><input value={form.managerName} onChange={e => setForm({ ...form, managerName: e.target.value })} style={input} /></Field><Field label="Residents involved (if applicable)"><input value={form.residents} onChange={e => setForm({ ...form, residents: e.target.value })} style={input} /></Field><Field label={tab === "daily" ? "Daily report" : "What happened?"}><textarea value={form.summary} onChange={e => setForm({ ...form, summary: e.target.value })} style={{ ...input, minHeight: 110, resize: "vertical" }} /></Field><Field label="Action taken / Owner follow-up needed (optional)"><textarea value={form.actionTaken} onChange={e => setForm({ ...form, actionTaken: e.target.value })} style={{ ...input, minHeight: 76, resize: "vertical" }} /></Field><button onClick={submit} disabled={!ready} style={ready ? btnPrimary : btnDisabled}>Send report to Owner</button>{status && <p style={{ color: theme.inkSoft, fontSize: 13 }}>{status}</p>}</Panel></div>;
 }
 
 function ResidentOvernightRequest() {
@@ -1101,6 +1131,10 @@ function SettingsTab({ data, persist, addAudit }) {
           <input value={local.managerPhone} onChange={e => setLocal({ ...local, managerPhone: e.target.value })} style={input} placeholder="(555) 555-1212" />
         </Field>
       </div>
+      <Field label="House Manager access code">
+        <input type="password" value={local.houseManagerAccessCode || ""} onChange={e => setLocal({ ...local, houseManagerAccessCode: e.target.value })} style={input} placeholder="Create a private code to share with the House Manager" />
+      </Field>
+      <p style={{ fontSize: 12, color: theme.inkSoft, marginTop: -6, marginBottom: 14 }}>The House Manager uses this code at the private reporting link. Change it any time access needs to be removed.</p>
       <div style={{ fontSize: 12.5, fontWeight: 600, color: theme.inkSoft, marginBottom: 8 }}>COMMUNITY HOURS</div>
       <div className="curfew-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 16 }}>
         {DAY_NAMES.map((d, i) => (
