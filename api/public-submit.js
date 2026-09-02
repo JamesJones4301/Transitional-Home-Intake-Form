@@ -7,6 +7,21 @@ export default async function handler(req, res) {
   if (req.method !== "POST") { res.setHeader("Allow", "POST"); return res.status(405).json({ error: "Method not allowed." }); }
   try {
     const body = req.body || {};
+    if (body.type === "manager-daily" || body.type === "manager-incident") {
+      const managerName = clean(body.managerName), summary = clean(body.summary), accessCode = clean(body.accessCode);
+      if (!managerName || !summary || !accessCode) return res.status(400).json({ error: "Please complete the access code, your name, and the report." });
+      const data = (await readState()) || structuredClone(EMPTY_STATE);
+      if (!data.settings?.houseManagerAccessCode || accessCode !== data.settings.houseManagerAccessCode) return res.status(403).json({ error: "That House Manager access code is not valid. Contact the Owner." });
+      const createdAt = Date.now();
+      const report = { id: id(), managerName, residents: clean(body.residents), summary, actionTaken: clean(body.actionTaken), createdAt };
+      const isIncident = body.type === "manager-incident";
+      const key = isIncident ? "incidentReports" : "dailyReports";
+      data[key] = data[key] || [];
+      data[key].unshift(report);
+      data.auditLog.unshift({ id: id(), timestamp: createdAt, actor: managerName, action: isIncident ? "incident_report_submitted" : "daily_report_submitted", detail: summary });
+      await writeState(data);
+      return res.status(201).json({ ok: true });
+    }
     if (body.type === "maintenance") {
       const name = clean(body.name), phone = clean(body.phone), location = clean(body.location), description = clean(body.description);
       if (!name || !phone || !location || !description) return res.status(400).json({ error: "Please complete the required maintenance request fields." });
