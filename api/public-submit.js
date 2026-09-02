@@ -37,10 +37,10 @@ export default async function handler(req, res) {
     }
     if (body.type !== "intake") return res.status(400).json({ error: "Unsupported public submission." });
     const name = clean(body.name), phone = clean(body.phone), room = clean(body.room), bed = clean(body.bed);
-    if (!name || !phone || !room || !bed || !body.agreementAccepted) return res.status(400).json({ error: "Please complete the required application fields and agreement." });
+    if (!name || !phone || !room || !bed || !body.agreementAccepted || !body.screeningAccurate) return res.status(400).json({ error: "Please complete the required application fields and agreement." });
     const data = (await readState()) || structuredClone(EMPTY_STATE);
     const submittedAt = Date.now();
-    const tenant = { id: id(), name, phone, email: clean(body.email), room, bed, admissionDate: new Date(body.admissionDate || submittedAt).getTime(), active: false, approvalStatus: "pending", submittedAt, leaseSigned: true, signedAt: submittedAt, consentDrugTest: Boolean(body.consentDrugTest), occupancyTermsAccepted: true, administrativeFee: 150, paymentsNonRefundable: true };
+    const tenant = { id: id(), name, phone, email: clean(body.email), room, bed, admissionDate: new Date(body.admissionDate || submittedAt).getTime(), active: false, approvalStatus: "pending", submittedAt, leaseSigned: true, signedAt: submittedAt, consentDrugTest: Boolean(body.consentDrugTest), occupancyTermsAccepted: true, programStandardsAccepted: Boolean(body.programStandardsAccepted), moveInHygieneAccepted: Boolean(body.moveInHygieneAccepted), screening: body.screening || {}, screeningAccurate: true, administrativeFee: 150, paymentsNonRefundable: true };
     data.tenants.push(tenant);
     data.auditLog.unshift({ id: id(), timestamp: submittedAt, actor: name, action: "intake_submitted", detail: `Submitted for approval. Requested Room ${room}, Bed ${bed}.` });
     await writeState(data);
