@@ -730,6 +730,7 @@ function MaintenanceTab({ data }) {
 }
 
 function ResidentOvernightRequest() {
+  const [residentTab, setResidentTab] = useState("overnight");
   const [form, setForm] = useState({ name: "", phone: "", requestedDate: "", returnDate: "", reason: "" });
   const [consent, setConsent] = useState(false);
   const [status, setStatus] = useState("");
@@ -746,7 +747,12 @@ function ResidentOvernightRequest() {
     } catch (error) { setStatus(error.message || "Your request could not be submitted."); }
     finally { setSubmitting(false); }
   };
-  return <><Panel title="Overnight stay request" subtitle="Your request is reviewed by the program team before it is approved.">
+  return <>
+    <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+      <button onClick={() => setResidentTab("overnight")} style={residentTab === "overnight" ? tabActive : tabInactive}><Moon size={14} style={{ marginRight: 5, verticalAlign: -2 }} />Overnight stay</button>
+      <button onClick={() => setResidentTab("maintenance")} style={residentTab === "maintenance" ? tabActive : tabInactive}><Wrench size={14} style={{ marginRight: 5, verticalAlign: -2 }} />Maintenance request</button>
+    </div>
+    {residentTab === "overnight" && <Panel title="Overnight stay request" subtitle="Your request is reviewed by the program team before it is approved.">
     <Field label="Full name"><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={input} /></Field>
     <Field label="Phone number"><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} style={input} /></Field>
     <div className="two-col-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}><Field label="Leaving"><input type="date" value={form.requestedDate} onChange={e => setForm({ ...form, requestedDate: e.target.value })} style={input} /></Field><Field label="Returning"><input type="date" value={form.returnDate} onChange={e => setForm({ ...form, returnDate: e.target.value })} style={input} /></Field></div>
@@ -754,7 +760,9 @@ function ResidentOvernightRequest() {
     <CheckField label="I consent to a drug test upon my return from this trip" checked={consent} onChange={setConsent} />
     <button disabled={!canSubmit || submitting} onClick={submit} style={canSubmit && !submitting ? btnPrimary : btnDisabled}>{submitting ? "Submitting…" : "Submit request"}</button>
     {status && <p style={{ color: theme.inkSoft, fontSize: 13, marginTop: 12 }}>{status}</p>}
-  </Panel><MaintenanceRequest /></>;
+    </Panel>}
+    {residentTab === "maintenance" && <MaintenanceRequest />}
+  </>;
 }
 
 function MaintenanceRequest() {
