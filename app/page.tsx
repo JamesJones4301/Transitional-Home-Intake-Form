@@ -383,6 +383,7 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
   const [agreeOccupancyTerms, setAgreeOccupancyTerms] = useState(false);
   const [agreeProgramStandards, setAgreeProgramStandards] = useState(false);
   const [agreeMoveInHygiene, setAgreeMoveInHygiene] = useState(false);
+  const [agreeCurseJar, setAgreeCurseJar] = useState(false);
   const [screening, setScreening] = useState({ independentLiving: "", legalOrSupervision: "", treatmentSupport: "", registryRequirement: "", concerns: "" });
   const [screeningAccurate, setScreeningAccurate] = useState(false);
   const [consentTest, setConsentTest] = useState(false);
@@ -390,13 +391,13 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
   const [done, setDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const canSubmit = form.name && form.phone && form.room && form.bed && agreeLease && agreeRules && agreeOccupancyTerms && agreeProgramStandards && agreeMoveInHygiene && screening.independentLiving && screening.legalOrSupervision && screening.treatmentSupport && screening.registryRequirement && screeningAccurate &&
+  const canSubmit = form.name && form.phone && form.room && form.bed && agreeLease && agreeRules && agreeOccupancyTerms && agreeProgramStandards && agreeMoveInHygiene && agreeCurseJar && screening.independentLiving && screening.legalOrSupervision && screening.treatmentSupport && screening.registryRequirement && screeningAccurate &&
     signature.trim().toLowerCase() === form.name.trim().toLowerCase() && signature.trim().length > 1;
 
   const submit = async () => {
     setSubmitting(true);
     try {
-      const response = await fetch("/api/public-submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "intake", ...form, consentDrugTest: consentTest, agreementAccepted: true, programStandardsAccepted: agreeProgramStandards, moveInHygieneAccepted: agreeMoveInHygiene, screening, screeningAccurate }) });
+      const response = await fetch("/api/public-submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "intake", ...form, consentDrugTest: consentTest, agreementAccepted: true, programStandardsAccepted: agreeProgramStandards, moveInHygieneAccepted: agreeMoveInHygiene, curseJarAccepted: agreeCurseJar, screening, screeningAccurate }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Your application could not be submitted.");
       setDone(true);
@@ -416,7 +417,7 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
           <p style={{ color: theme.inkSoft, fontSize: 14, marginBottom: 18 }}>
             Your requested Room {form.room}, Bed {form.bed} assignment will be confirmed by the program team. We will email {form.email || "you"} once a decision is made.
           </p>
-          <button onClick={onDone} style={btnPrimary}>Back to home</button>
+          <div style={{ display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap" }}><button onClick={() => window.print()} style={btnSecondary}>Print / save intake copy</button><button onClick={onDone} style={btnPrimary}>Back to home</button></div>
         </div>
       </Panel>
     );
@@ -480,18 +481,20 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
         <strong style={{ display: "block", marginBottom: 6 }}>Important occupancy and payment terms</strong>
         <ul style={{ margin: 0, paddingLeft: 20 }}>
           <li>This occupancy agreement may be terminated if a resident's conduct creates an environment that other residents reasonably experience as unwelcoming.</li>
-          <li>Conduct that disrupts another resident's stay or the shared living environment will result in removal from the residence.</li>
+          <li>Conduct that disrupts another resident's stay or the shared living environment may result in corrective action or termination of occupancy, subject to applicable law and program policy.</li>
           <li>All payments are non-refundable.</li>
-          <li>A $150 administrative fee is required and is non-refundable.</li>
+          <li>A $200 administrative fee is required and is non-refundable.</li>
           <li>Funds must be paid by cash, business check made payable to Ashrei Impact Foundation, or an online payment platform once provided by the program.</li>
+          <li>Residents who plan to move out must provide at least 30 days' written notice. When an eviction process applies, the notice period may range from 3 to 30 days as required by applicable law and the formal notice.</li>
         </ul>
       </div>
       <CheckField label="I have read, understand, and agree to the occupancy and payment terms above" checked={agreeOccupancyTerms} onChange={setAgreeOccupancyTerms} />
       <div style={{ background: theme.primarySoft, borderRadius: 10, padding: "0.95rem 1rem", margin: "1rem 0", fontSize: 13, lineHeight: 1.6 }}>
         <strong style={{ display: "block", marginBottom: 6 }}>Program standards acknowledgment</strong>
-        I understand this is a clean and sober, faith-centered shared living environment. I agree to comply with sober-living safety rules, mandatory and random drug/alcohol testing, curfew and pre-approved overnight requirements, visitor limits, resident privacy, maintenance reporting, and the grievance process. I understand serious or repeated unsafe conduct may result in corrective action or program discharge, subject to applicable law and program policy.
+        I understand this is a clean and sober, faith-centered shared living environment. Alcohol and illegal drugs are not allowed onsite. Cigarettes may not be smoked anywhere around the house; smoking is permitted only down at the street. I agree to comply with sober-living safety rules, mandatory and random drug/alcohol testing, curfew and pre-approved overnight requirements, visitor limits, resident privacy, maintenance reporting, and the grievance process. I understand serious or repeated unsafe conduct may result in corrective action or program discharge, subject to applicable law and program policy.
       </div>
       <CheckField label="I have reviewed and agree to the House Rules, safety standards, testing, curfew/overnight, visitor, maintenance, grievance, privacy, and program-discharge policies" checked={agreeProgramStandards} onChange={setAgreeProgramStandards} />
+      <CheckField label="By checking this box, I acknowledge there will be a curse jar and I am willing to participate by placing $1 in the jar if I curse or act unruly toward another house guest" checked={agreeCurseJar} onChange={setAgreeCurseJar} />
       <div style={{ background: theme.accentSoft, borderRadius: 10, padding: "0.95rem 1rem", margin: "1rem 0", fontSize: 13, lineHeight: 1.6 }}>
         <strong style={{ display: "block", marginBottom: 6 }}>Required before entering your assigned room</strong>
         All washable clothing and fabric items must be placed directly into laundry and washed/dried as directed with the program-provided bedbug laundry detergent/additive before entering the bedroom or storage area. You must also shower before settling into your assigned room and report any suspected pest concern immediately.
