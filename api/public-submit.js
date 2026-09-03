@@ -55,7 +55,7 @@ export default async function handler(req, res) {
     if (!name || !phone || !room || !bed || !body.agreementAccepted || !body.screeningAccurate) return res.status(400).json({ error: "Please complete the required application fields and agreement." });
     const data = (await readState()) || structuredClone(EMPTY_STATE);
     const submittedAt = Date.now();
-    const tenant = { id: id(), name, phone, email: clean(body.email), room, bed, admissionDate: new Date(body.admissionDate || submittedAt).getTime(), active: false, approvalStatus: "pending", submittedAt, leaseSigned: true, signedAt: submittedAt, consentDrugTest: Boolean(body.consentDrugTest), occupancyTermsAccepted: true, programStandardsAccepted: Boolean(body.programStandardsAccepted), moveInHygieneAccepted: Boolean(body.moveInHygieneAccepted), screening: body.screening || {}, screeningAccurate: true, administrativeFee: 150, paymentsNonRefundable: true };
+    const tenant = { id: id(), name, phone, email: clean(body.email), room, bed, admissionDate: new Date(body.admissionDate || submittedAt).getTime(), active: false, approvalStatus: "pending", submittedAt, leaseSigned: true, signedAt: submittedAt, consentDrugTest: Boolean(body.consentDrugTest), occupancyTermsAccepted: true, programStandardsAccepted: Boolean(body.programStandardsAccepted), moveInHygieneAccepted: Boolean(body.moveInHygieneAccepted), curseJarAccepted: Boolean(body.curseJarAccepted), screening: body.screening || {}, screeningAccurate: true, administrativeFee: 200, paymentsNonRefundable: true };
     data.tenants.push(tenant);
     data.auditLog.unshift({ id: id(), timestamp: submittedAt, actor: name, action: "intake_submitted", detail: `Submitted for approval. Requested Room ${room}, Bed ${bed}.` });
     await writeState(data);
