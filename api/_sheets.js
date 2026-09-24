@@ -36,7 +36,7 @@ function rows(data) {
   return {
     Residents: data.tenants.map(t => [t.id, t.name, t.phone || "", t.email || "", t.room || "", t.bed || "", iso(t.admissionDate), Boolean(t.active), iso(t.signedAt), Boolean(t.consentDrugTest), Boolean(t.occupancyTermsAccepted), t.administrativeFee || 150, Boolean(t.paymentsNonRefundable), t.approvalStatus || "pending", iso(t.submittedAt), t.reviewedBy || "", iso(t.reviewedAt)]),
     "Check-Ins": data.checkins.map(c => [c.id, c.tenantId, data.tenants.find(t => t.id === c.tenantId)?.name || "", c.type, new Date(c.timestamp).toISOString().slice(0, 10), new Date(c.timestamp).toLocaleTimeString(), c.onTime ? "On time" : "Late", c.notes || ""]),
-    "Overnight Requests": data.requests.map(r => [r.id, r.tenantId, data.tenants.find(t => t.id === r.tenantId)?.name || "", r.destination || "", r.requestedDate || "", r.returnDate || "", r.reason || "", r.status, r.decidedBy || "", iso(r.decidedAt)]),
+    "Overnight Requests": data.requests.map(r => [r.id, r.tenantId, data.tenants.find(t => t.id === r.tenantId)?.name || "", r.destination || "", r.requestedDate || "", r.returnDate || "", r.reason || "", r.status, r.decidedBy || "", iso(r.decidedAt), r.address || "", r.hostName || "", r.hostRelationship || ""]),
     "Program Settings": [["Coordinator Name", data.settings?.managerName || ""], ["Coordinator Phone", data.settings?.managerPhone || ""]],
     "Audit Log": data.auditLog.map(a => [a.id, iso(a.timestamp), a.actor || "", a.action || "", a.entityType || "", a.entityId || "", a.detail || ""]),
     Notifications: data.notifications.map(n => [n.id, n.to || "", n.channel || "", n.message || "", "queued", iso(n.timestamp), ""]),
@@ -54,12 +54,15 @@ export async function writeState(data) {
   const client = await sheets();
   const safe = { ...EMPTY_STATE, ...data, settings: { ...EMPTY_STATE.settings, ...(data.settings || {}) } };
   const sheetRows = rows(safe);
-  await client.spreadsheets.values.batchClear({ spreadsheetId: SPREADSHEET_ID, requestBody: { ranges: ["Residents!A2:Q1000", "'Check-Ins'!A2:H1000", "'Overnight Requests'!A2:J1000", "'Program Settings'!A2:C1000", "'Audit Log'!A2:G2001", "Notifications!A2:G2001"] } });
-  const updates = [{ range: "'Portal State'!A1", values: [[JSON.stringify(safe)]] }];
+  await client.spreadsheets.values.batchClear({ spreadsheetId: SPREADSHEET_ID, requestBody: { ranges: ["Residents!A2:Q1000", "'Check-Ins'!A2:H1000", "'Overnight Requests'!A2:M1000", "'Program Settings'!A2:C1000", "'Audit Log'!A2:G2001", "Notifications!A2:G2001"] } });
+  const updates = [
+    { range: "'Portal State'!A1", values: [[JSON.stringify(safe)]] },
+    { range: "'Overnight Requests'!D1", values: [["Stay Location"]] },
+    { range: "'Overnight Requests'!K1:M1", values: [["Street Address", "Person Staying With", "Relationship"]] },
+  ];
   for (const [name, values] of Object.entries(sheetRows)) if (values.length) updates.push({ range: `'${name}'!A2`, values });
   await client.spreadsheets.values.batchUpdate({ spreadsheetId: SPREADSHEET_ID, requestBody: { valueInputOption: "RAW", data: updates } });
   return safe;
 }
 
 export { EMPTY_STATE };
-
