@@ -521,7 +521,7 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
 function PayPalFeeButton() {
   return (
     <div style={{ marginTop: 16 }}>
-      <a href="https://www.paypal.me/AIF201" target="_blank" rel="noopener noreferrer" style={{ ...btnSecondary, display: "inline-block", textDecoration: "none" }}>Pay $100 administrative/application fee with PayPal</a>
+      <a href="https://www.paypal.com/ncp/payment/8P5J6RWQF8TKC" target="_blank" rel="noopener noreferrer" style={{ ...btnSecondary, display: "inline-block", textDecoration: "none" }}>Pay $100 administrative/application fee with PayPal</a>
       <p style={{ color: theme.inkSoft, fontSize: 12, margin: "8px 0 0" }}>PayPal opens in a new tab. Enter $100 and include your full name with the payment.</p>
     </div>
   );
