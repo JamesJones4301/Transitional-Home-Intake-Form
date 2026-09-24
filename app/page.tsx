@@ -91,7 +91,7 @@ function iso(value) {
 
 function sheetRows(data) {
   return {
-    Residents: data.tenants.map(t => [t.id, t.name, t.phone || "", t.email || "", t.room || "", t.bed || "", iso(t.admissionDate), Boolean(t.active), iso(t.signedAt), Boolean(t.consentDrugTest), Boolean(t.occupancyTermsAccepted), t.administrativeFee || 150, Boolean(t.paymentsNonRefundable), t.approvalStatus || (t.active ? "approved" : "pending"), iso(t.submittedAt), t.reviewedBy || "", iso(t.reviewedAt)]),
+    Residents: data.tenants.map(t => [t.id, t.name, t.phone || "", t.email || "", t.room || "", t.bed || "", iso(t.admissionDate), Boolean(t.active), iso(t.signedAt), Boolean(t.consentDrugTest), Boolean(t.occupancyTermsAccepted), t.administrativeFee ?? 100, Boolean(t.paymentsNonRefundable), t.approvalStatus || (t.active ? "approved" : "pending"), iso(t.submittedAt), t.reviewedBy || "", iso(t.reviewedAt)]),
     "Check-Ins": data.checkins.map(c => { const d = new Date(c.timestamp); return [c.id, c.tenantId, data.tenants.find(t => t.id === c.tenantId)?.name || "", c.type, d.toISOString().slice(0, 10), d.toLocaleTimeString(), c.onTime ? "On time" : "Late", c.notes || ""]; }),
     "Overnight Requests": data.requests.map(r => [r.id, r.tenantId, data.tenants.find(t => t.id === r.tenantId)?.name || "", r.destination || "", r.requestedDate || "", r.returnDate || "", r.reason || "", r.status, r.decidedBy || "", iso(r.decidedAt), r.address || "", r.hostName || "", r.hostRelationship || ""]),
     "Program Settings": [["Coordinator Name", data.settings.managerName || ""], ["Coordinator Phone", data.settings.managerPhone || ""], ...DAY_NAMES.map((day, index) => [`Curfew ${day}`, data.settings.curfews[index] || ""])],
@@ -418,6 +418,7 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
             Your requested Room {form.room}, Bed {form.bed} assignment will be confirmed by the program team. We will email {form.email || "you"} once a decision is made.
           </p>
           <div style={{ display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap" }}><button onClick={() => window.print()} style={btnSecondary}>Print / save intake copy</button><button onClick={onDone} style={btnPrimary}>Back to home</button></div>
+          <PayPalFeeButton />
         </div>
       </Panel>
     );
@@ -483,8 +484,8 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
           <li>This occupancy agreement may be terminated if a resident's conduct creates an environment that other residents reasonably experience as unwelcoming.</li>
           <li>Conduct that disrupts another resident's stay or the shared living environment may result in corrective action or termination of occupancy, subject to applicable law and program policy.</li>
           <li>All payments are non-refundable.</li>
-          <li>A $200 administrative fee is required and is non-refundable.</li>
-          <li>Funds must be paid by cash, business check made payable to Ashrei Impact Foundation, or an online payment platform once provided by the program.</li>
+          <li>A $100 administrative/application fee is required and is non-refundable.</li>
+          <li>Funds must be paid by cash, business check made payable to Ashrei Impact Foundation, or PayPal using the button below.</li>
           <li>Residents who plan to move out must provide at least 30 days' written notice. When an eviction process applies, the notice period may range from 3 to 30 days as required by applicable law and the formal notice.</li>
         </ul>
       </div>
@@ -512,7 +513,17 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
       <button disabled={!canSubmit || submitting} onClick={submit} style={canSubmit && !submitting ? btnPrimary : btnDisabled}>
         {submitting ? "Submitting securely…" : "Sign and submit"}
       </button>
+      <PayPalFeeButton />
     </Panel>
+  );
+}
+
+function PayPalFeeButton() {
+  return (
+    <div style={{ marginTop: 16 }}>
+      <a href="https://www.paypal.me/AIF201" target="_blank" rel="noopener noreferrer" style={{ ...btnSecondary, display: "inline-block", textDecoration: "none" }}>Pay $100 administrative/application fee with PayPal</a>
+      <p style={{ color: theme.inkSoft, fontSize: 12, margin: "8px 0 0" }}>PayPal opens in a new tab. Enter $100 and include your full name with the payment.</p>
+    </div>
   );
 }
 
