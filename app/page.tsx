@@ -93,7 +93,7 @@ function sheetRows(data) {
   return {
     Residents: data.tenants.map(t => [t.id, t.name, t.phone || "", t.email || "", t.room || "", t.bed || "", iso(t.admissionDate), Boolean(t.active), iso(t.signedAt), Boolean(t.consentDrugTest), Boolean(t.occupancyTermsAccepted), t.administrativeFee || 150, Boolean(t.paymentsNonRefundable), t.approvalStatus || (t.active ? "approved" : "pending"), iso(t.submittedAt), t.reviewedBy || "", iso(t.reviewedAt)]),
     "Check-Ins": data.checkins.map(c => { const d = new Date(c.timestamp); return [c.id, c.tenantId, data.tenants.find(t => t.id === c.tenantId)?.name || "", c.type, d.toISOString().slice(0, 10), d.toLocaleTimeString(), c.onTime ? "On time" : "Late", c.notes || ""]; }),
-    "Overnight Requests": data.requests.map(r => [r.id, r.tenantId, data.tenants.find(t => t.id === r.tenantId)?.name || "", r.destination || "", r.requestedDate || "", r.returnDate || "", r.reason || "", r.status, r.decidedBy || "", iso(r.decidedAt)]),
+    "Overnight Requests": data.requests.map(r => [r.id, r.tenantId, data.tenants.find(t => t.id === r.tenantId)?.name || "", r.destination || "", r.requestedDate || "", r.returnDate || "", r.reason || "", r.status, r.decidedBy || "", iso(r.decidedAt), r.address || "", r.hostName || "", r.hostRelationship || ""]),
     "Program Settings": [["Coordinator Name", data.settings.managerName || ""], ["Coordinator Phone", data.settings.managerPhone || ""], ...DAY_NAMES.map((day, index) => [`Curfew ${day}`, data.settings.curfews[index] || ""])],
     "Audit Log": data.auditLog.map(a => [a.id, iso(a.timestamp), a.actor || "", a.action || "", a.entityType || "", a.entityId || "", a.detail || ""]),
     Notifications: data.notifications.map(n => [n.id, n.to || "", n.channel || "", n.message || "", "queued", iso(n.timestamp), ""]),
@@ -598,6 +598,7 @@ function ResidentView({ data, persist, addAudit, addNotification, residentId, se
 function OvernightPanel({ tenant, data, persist, addAudit, eligibleForOvernight, daysIn }) {
   const [date, setDate] = useState("");
   const [returnDate, setReturnDate] = useState("");
+  const [stay, setStay] = useState({ destination: "", address: "", hostName: "", hostRelationship: "", reason: "" });
   const [consentThisTrip, setConsentThisTrip] = useState(false);
   const myRequests = data.requests.filter(r => r.tenantId === tenant.id).sort((a, b) => b.createdAt - a.createdAt);
 
@@ -605,12 +606,13 @@ function OvernightPanel({ tenant, data, persist, addAudit, eligibleForOvernight,
   if (daysIn <= 10) blockers.push(`You need more than 10 days in the program (currently day ${daysIn}).`);
   if (!tenant.consentDrugTest) blockers.push("Your intake record doesn't show drug-test consent on file — see the program coordinator.");
 
-  const canSubmit = eligibleForOvernight && date && returnDate && consentThisTrip;
+  const canSubmit = eligibleForOvernight && date && returnDate && returnDate >= date && Object.values(stay).every(value => value.trim()) && consentThisTrip;
 
   const submit = async () => {
     const next = JSON.parse(JSON.stringify(data));
     const req = {
       id: uid(), tenantId: tenant.id, requestedDate: date, returnDate,
+      destination: stay.destination.trim(), address: stay.address.trim(), hostName: stay.hostName.trim(), hostRelationship: stay.hostRelationship.trim(), reason: stay.reason.trim(),
       status: "pending", createdAt: Date.now(), decidedAt: null, decidedBy: null,
       testRequired: true, testResult: null,
       eligibleAtRequest: true,
@@ -618,7 +620,7 @@ function OvernightPanel({ tenant, data, persist, addAudit, eligibleForOvernight,
     next.requests.unshift(req);
     addAudit(next, tenant.name, "overnight_requested", `Requested overnight ${date} to ${returnDate}.`);
     await persist(next);
-    setDate(""); setReturnDate(""); setConsentThisTrip(false);
+    setDate(""); setReturnDate(""); setStay({ destination: "", address: "", hostName: "", hostRelationship: "", reason: "" }); setConsentThisTrip(false);
   };
 
   return (
@@ -633,6 +635,13 @@ function OvernightPanel({ tenant, data, persist, addAudit, eligibleForOvernight,
             <Field label="Leaving"><input type="date" value={date} onChange={e => setDate(e.target.value)} style={input} /></Field>
             <Field label="Returning"><input type="date" value={returnDate} onChange={e => setReturnDate(e.target.value)} style={input} /></Field>
           </div>
+          <Field label="Stay location"><input required value={stay.destination} onChange={e => setStay({ ...stay, destination: e.target.value })} style={input} placeholder="City and place you will stay" /></Field>
+          <Field label="Street address"><input required value={stay.address} onChange={e => setStay({ ...stay, address: e.target.value })} style={input} placeholder="Street, city, state and ZIP" /></Field>
+          <div className="two-col-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Field label="Person you are staying with"><input required value={stay.hostName} onChange={e => setStay({ ...stay, hostName: e.target.value })} style={input} /></Field>
+            <Field label="Relationship to this person"><input required value={stay.hostRelationship} onChange={e => setStay({ ...stay, hostRelationship: e.target.value })} style={input} /></Field>
+          </div>
+          <Field label="Reason for overnight stay"><textarea required value={stay.reason} onChange={e => setStay({ ...stay, reason: e.target.value })} style={{ ...input, minHeight: 70, resize: "vertical" }} /></Field>
           <CheckField label="I consent to a drug test upon my return from this trip" checked={consentThisTrip} onChange={setConsentThisTrip} />
           <button disabled={!canSubmit} onClick={submit} style={{ ...(canSubmit ? btnPrimary : btnDisabled), marginTop: 6 }}>
             Submit request
@@ -646,7 +655,7 @@ function OvernightPanel({ tenant, data, persist, addAudit, eligibleForOvernight,
           <div style={{ display: "grid", gap: 6 }}>
             {myRequests.map(r => (
               <div key={r.id} style={listRow}>
-                <span>{r.requestedDate} → {r.returnDate}</span>
+                <span>{r.requestedDate} → {r.returnDate}{r.destination ? ` · ${r.destination}` : ""}</span>
                 <Badge tone={r.status === "approved" ? "accent" : r.status === "denied" ? "red" : "amber"}>
                   {r.status}
                 </Badge>
@@ -765,11 +774,11 @@ function HouseManagerPortal() {
 
 function ResidentOvernightRequest() {
   const [residentTab, setResidentTab] = useState("overnight");
-  const [form, setForm] = useState({ name: "", phone: "", requestedDate: "", returnDate: "", reason: "" });
+  const [form, setForm] = useState({ name: "", phone: "", requestedDate: "", returnDate: "", destination: "", address: "", hostName: "", hostRelationship: "", reason: "" });
   const [consent, setConsent] = useState(false);
   const [status, setStatus] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const canSubmit = form.name && form.phone && form.requestedDate && form.returnDate && consent;
+  const canSubmit = Object.values(form).every(value => value.trim()) && form.returnDate >= form.requestedDate && consent;
   const submit = async () => {
     setSubmitting(true); setStatus("");
     try {
@@ -777,7 +786,7 @@ function ResidentOvernightRequest() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Your request could not be submitted.");
       setStatus("Your overnight request was submitted for program-team approval.");
-      setForm({ name: "", phone: "", requestedDate: "", returnDate: "", reason: "" }); setConsent(false);
+      setForm({ name: "", phone: "", requestedDate: "", returnDate: "", destination: "", address: "", hostName: "", hostRelationship: "", reason: "" }); setConsent(false);
     } catch (error) { setStatus(error.message || "Your request could not be submitted."); }
     finally { setSubmitting(false); }
   };
@@ -790,7 +799,13 @@ function ResidentOvernightRequest() {
     <Field label="Full name"><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={input} /></Field>
     <Field label="Phone number"><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} style={input} /></Field>
     <div className="two-col-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}><Field label="Leaving"><input type="date" value={form.requestedDate} onChange={e => setForm({ ...form, requestedDate: e.target.value })} style={input} /></Field><Field label="Returning"><input type="date" value={form.returnDate} onChange={e => setForm({ ...form, returnDate: e.target.value })} style={input} /></Field></div>
-    <Field label="Reason (optional)"><input value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} style={input} /></Field>
+    <Field label="Stay location"><input required value={form.destination} onChange={e => setForm({ ...form, destination: e.target.value })} style={input} placeholder="City and place you will stay" /></Field>
+    <Field label="Street address"><input required value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} style={input} placeholder="Street, city, state and ZIP" /></Field>
+    <div className="two-col-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <Field label="Person you are staying with"><input required value={form.hostName} onChange={e => setForm({ ...form, hostName: e.target.value })} style={input} /></Field>
+      <Field label="Relationship to this person"><input required value={form.hostRelationship} onChange={e => setForm({ ...form, hostRelationship: e.target.value })} style={input} /></Field>
+    </div>
+    <Field label="Reason for overnight stay"><textarea required value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} style={{ ...input, minHeight: 70, resize: "vertical" }} /></Field>
     <CheckField label="I consent to a drug test upon my return from this trip" checked={consent} onChange={setConsent} />
     <button disabled={!canSubmit || submitting} onClick={submit} style={canSubmit && !submitting ? btnPrimary : btnDisabled}>{submitting ? "Submitting…" : "Submit request"}</button>
     {status && <p style={{ color: theme.inkSoft, fontSize: 13, marginTop: 12 }}>{status}</p>}
@@ -987,6 +1002,9 @@ function RequestsTab({ data, persist, addAudit, addNotification }) {
                     <div>
                       <div style={{ fontWeight: 600 }}>{tenant?.name || "Unknown"}</div>
                       <div style={{ fontSize: 13, color: theme.inkSoft }}>{r.requestedDate} → {r.returnDate} · drug test required on return</div>
+                      <div style={{ fontSize: 13, marginTop: 5 }}><strong>Stay:</strong> {r.destination || "Not recorded"} · {r.address || "Address not recorded"}</div>
+                      <div style={{ fontSize: 13 }}><strong>With:</strong> {r.hostName || "Not recorded"} · {r.hostRelationship || "Relationship not recorded"}</div>
+                      <div style={{ fontSize: 13 }}><strong>Reason:</strong> {r.reason || "Not recorded"}</div>
                     </div>
                     <div style={{ display: "flex", gap: 6 }}>
                       <button onClick={() => decide(r, "approved")} style={btnSmallPrimary}><Check size={14} /></button>
@@ -1005,8 +1023,11 @@ function RequestsTab({ data, persist, addAudit, addNotification }) {
             {decided.map(r => {
               const tenant = data.tenants.find(t => t.id === r.tenantId);
               return (
-                <div key={r.id} style={listRow}>
+                <div key={r.id} style={{ ...listRow, alignItems: "flex-start", flexDirection: "column", gap: 4 }}>
                   <span>{tenant?.name} — {r.requestedDate} → {r.returnDate}</span>
+                  <span style={{ fontSize: 13 }}>Stay: {r.destination || "Not recorded"} · {r.address || "Address not recorded"}</span>
+                  <span style={{ fontSize: 13 }}>With: {r.hostName || "Not recorded"} · {r.hostRelationship || "Relationship not recorded"}</span>
+                  <span style={{ fontSize: 13 }}>Reason: {r.reason || "Not recorded"}</span>
                   <Badge tone={r.status === "approved" ? "accent" : "red"}>{r.status}</Badge>
                 </div>
               );
@@ -1249,4 +1270,3 @@ const btnSmallPrimary = { ...btnBase, background: theme.accent, color: "#fff", p
 const btnSmallDanger = { ...btnBase, background: theme.redSoft, color: theme.red, padding: "0.4rem 0.6rem" };
 const tabActive = { ...btnBase, background: theme.primary, color: "#fff", padding: "0.4rem 0.8rem" };
 const tabInactive = { ...btnBase, background: "transparent", color: theme.inkSoft, padding: "0.4rem 0.8rem", border: `1px solid ${theme.border}` };
-
