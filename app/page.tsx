@@ -352,8 +352,8 @@ function Landing({ setRole, setResidentId, data }) {
         {activeCount > 0 && ` ${activeCount} active member${activeCount === 1 ? "" : "s"}.`}
       </p>
       <div className="role-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        <RoleCard icon={<PenLine size={20} />} title="New member intake" desc="Complete your occupancy agreement and program commitments" onClick={() => setRole("intake")} accent />
-        <RoleCard icon={<LogIn size={20} />} title="I'm a member" desc="Submit an overnight request for program-team approval" onClick={() => setRole("resident")} />
+        <RoleCard icon={<PenLine size={20} />} title="Ashrei New Member Intake" desc="Complete your occupancy agreement and program commitments" onClick={() => setRole("intake")} accent />
+        <RoleCard icon={<LogIn size={20} />} title="I am a member at Ashrei currently" desc="Submit an overnight request for program-team approval" onClick={() => setRole("resident")} />
       </div>
     </div>
   );
@@ -425,7 +425,7 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
   }
 
   return (
-    <Panel title="New member intake" subtitle="Complete the occupancy agreement and record the member's room and bed assignment.">
+    <Panel title="Ashrei New Member Intake" subtitle="Complete the occupancy agreement and record the member's room and bed assignment.">
       <Field label="Full name">
         <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={input} placeholder="Jordan Reyes" />
       </Field>
