@@ -37,7 +37,8 @@ export default async function handler(req, res) {
     }
     if (body.type === "overnight") {
       const name = clean(body.name), phone = clean(body.phone), requestedDate = clean(body.requestedDate), returnDate = clean(body.returnDate);
-      if (!name || !phone || !requestedDate || !returnDate || !body.consentDrugTest) return res.status(400).json({ error: "Please complete every required overnight-request field." });
+      const destination = clean(body.destination), address = clean(body.address), hostName = clean(body.hostName), hostRelationship = clean(body.hostRelationship), reason = clean(body.reason);
+      if (!name || !phone || !requestedDate || !returnDate || !destination || !address || !hostName || !hostRelationship || !reason || !body.consentDrugTest) return res.status(400).json({ error: "Please complete every required overnight-request field, including the stay details and reason." });
       if (new Date(returnDate) < new Date(requestedDate)) return res.status(400).json({ error: "Your return date must be after your leaving date." });
       const data = (await readState()) || structuredClone(EMPTY_STATE);
       const tenant = data.tenants.find(t => t.active && t.name.toLowerCase() === name.toLowerCase() && t.phone.replace(/\D/g, "").slice(-4) === phone.replace(/\D/g, "").slice(-4));
@@ -45,7 +46,7 @@ export default async function handler(req, res) {
       const daysIn = Math.floor((Date.now() - tenant.admissionDate) / 86400000);
       if (daysIn <= 10 || !tenant.consentDrugTest) return res.status(400).json({ error: "This resident is not currently eligible for an overnight request. Please contact the program coordinator." });
       const createdAt = Date.now();
-      data.requests.unshift({ id: id(), tenantId: tenant.id, requestedDate, returnDate, reason: clean(body.reason), status: "pending", createdAt, decidedAt: null, decidedBy: null, testRequired: true, testResult: null, eligibleAtRequest: true });
+      data.requests.unshift({ id: id(), tenantId: tenant.id, requestedDate, returnDate, destination, address, hostName, hostRelationship, reason, status: "pending", createdAt, decidedAt: null, decidedBy: null, testRequired: true, testResult: null, eligibleAtRequest: true });
       data.auditLog.unshift({ id: id(), timestamp: createdAt, actor: tenant.name, action: "overnight_requested", detail: `Requested overnight ${requestedDate} to ${returnDate}.` });
       await writeState(data);
       return res.status(201).json({ ok: true });
@@ -64,4 +65,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Your application could not be saved right now. Please try again or contact Ashrei Impact Foundation." });
   }
 }
-
