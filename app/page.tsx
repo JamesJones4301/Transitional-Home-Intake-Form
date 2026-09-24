@@ -426,6 +426,10 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
 
   return (
     <Panel title="Ashrei New Member Intake" subtitle="Complete the occupancy agreement and record the member's room and bed assignment.">
+      <figure style={{ margin: "0 0 20px" }}>
+        <img src="/bird-pepper-place-exterior.jpg" alt="Exterior of Bird Pepper Place" width={1080} height={810} loading="eager" style={{ display: "block", width: "100%", height: 180, objectFit: "cover", objectPosition: "center 55%", borderRadius: 10 }} />
+        <figcaption style={{ fontSize: 12, color: theme.inkSoft, marginTop: 7 }}>Bird Pepper Place</figcaption>
+      </figure>
       <Field label="Full name">
         <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={input} placeholder="Jordan Reyes" />
       </Field>
