@@ -34,7 +34,7 @@ export async function assertOwner(req) {
 function iso(value) { return value ? new Date(value).toISOString() : ""; }
 function rows(data) {
   return {
-    Residents: data.tenants.map(t => [t.id, t.name, t.phone || "", t.email || "", t.room || "", t.bed || "", iso(t.admissionDate), Boolean(t.active), iso(t.signedAt), Boolean(t.consentDrugTest), Boolean(t.occupancyTermsAccepted), t.administrativeFee || 150, Boolean(t.paymentsNonRefundable), t.approvalStatus || "pending", iso(t.submittedAt), t.reviewedBy || "", iso(t.reviewedAt)]),
+    Residents: data.tenants.map(t => [t.id, t.name, t.phone || "", t.email || "", t.room || "", t.bed || "", iso(t.admissionDate), Boolean(t.active), iso(t.signedAt), Boolean(t.consentDrugTest), Boolean(t.occupancyTermsAccepted), t.administrativeFee ?? 100, Boolean(t.paymentsNonRefundable), t.approvalStatus || "pending", iso(t.submittedAt), t.reviewedBy || "", iso(t.reviewedAt)]),
     "Check-Ins": data.checkins.map(c => [c.id, c.tenantId, data.tenants.find(t => t.id === c.tenantId)?.name || "", c.type, new Date(c.timestamp).toISOString().slice(0, 10), new Date(c.timestamp).toLocaleTimeString(), c.onTime ? "On time" : "Late", c.notes || ""]),
     "Overnight Requests": data.requests.map(r => [r.id, r.tenantId, data.tenants.find(t => t.id === r.tenantId)?.name || "", r.destination || "", r.requestedDate || "", r.returnDate || "", r.reason || "", r.status, r.decidedBy || "", iso(r.decidedAt), r.address || "", r.hostName || "", r.hostRelationship || ""]),
     "Program Settings": [["Coordinator Name", data.settings?.managerName || ""], ["Coordinator Phone", data.settings?.managerPhone || ""]],

@@ -91,7 +91,7 @@ function iso(value) {
 
 function sheetRows(data) {
   return {
-    Residents: data.tenants.map(t => [t.id, t.name, t.phone || "", t.email || "", t.room || "", t.bed || "", iso(t.admissionDate), Boolean(t.active), iso(t.signedAt), Boolean(t.consentDrugTest), Boolean(t.occupancyTermsAccepted), t.administrativeFee || 150, Boolean(t.paymentsNonRefundable), t.approvalStatus || (t.active ? "approved" : "pending"), iso(t.submittedAt), t.reviewedBy || "", iso(t.reviewedAt)]),
+    Residents: data.tenants.map(t => [t.id, t.name, t.phone || "", t.email || "", t.room || "", t.bed || "", iso(t.admissionDate), Boolean(t.active), iso(t.signedAt), Boolean(t.consentDrugTest), Boolean(t.occupancyTermsAccepted), t.administrativeFee ?? 100, Boolean(t.paymentsNonRefundable), t.approvalStatus || (t.active ? "approved" : "pending"), iso(t.submittedAt), t.reviewedBy || "", iso(t.reviewedAt)]),
     "Check-Ins": data.checkins.map(c => { const d = new Date(c.timestamp); return [c.id, c.tenantId, data.tenants.find(t => t.id === c.tenantId)?.name || "", c.type, d.toISOString().slice(0, 10), d.toLocaleTimeString(), c.onTime ? "On time" : "Late", c.notes || ""]; }),
     "Overnight Requests": data.requests.map(r => [r.id, r.tenantId, data.tenants.find(t => t.id === r.tenantId)?.name || "", r.destination || "", r.requestedDate || "", r.returnDate || "", r.reason || "", r.status, r.decidedBy || "", iso(r.decidedAt), r.address || "", r.hostName || "", r.hostRelationship || ""]),
     "Program Settings": [["Coordinator Name", data.settings.managerName || ""], ["Coordinator Phone", data.settings.managerPhone || ""], ...DAY_NAMES.map((day, index) => [`Curfew ${day}`, data.settings.curfews[index] || ""])],
@@ -236,7 +236,7 @@ export default function App() {
   if (loading || !data) {
     return (
       <div style={{ background: theme.bg, minHeight: 400, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui" }}>
-        <div style={{ color: theme.inkSoft }}>Loading resident care workspace…</div>
+        <div style={{ color: theme.inkSoft }}>Loading member care workspace…</div>
       </div>
     );
   }
@@ -298,7 +298,7 @@ export default function App() {
 
 function GoogleSheetAccess({ onConnect, status }) {
   return (
-    <Panel title="Owner verification required" subtitle="Resident records and approval tools are restricted to the authorized Ashrei Impact Foundation Google account.">
+    <Panel title="Owner verification required" subtitle="Member records and approval tools are restricted to the authorized Ashrei Impact Foundation Google account.">
       <div style={{ background: theme.primarySoft, borderRadius: 10, padding: "0.9rem 1rem", marginBottom: 14, fontSize: 13, lineHeight: 1.6 }}>
         Sign in as <strong>{GOOGLE_OWNER_EMAIL}</strong> to open the management workspace and synchronize changes with the private Google Sheet.
       </div>
@@ -330,7 +330,7 @@ function Header({ role, setRole, setResidentId }) {
         <img src="/ashrei-impact-logo.svg" alt="Ashrei Impact Foundation" style={{ width: 52, height: 52, objectFit: "contain", borderRadius: 8 }} />
         <div>
           <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 19 }}>Ashrei Impact Foundation</div>
-          <div style={{ fontSize: 10, color: theme.inkSoft, letterSpacing: "0.08em", textTransform: "uppercase" }}>Resident care portal</div>
+          <div style={{ fontSize: 10, color: theme.inkSoft, letterSpacing: "0.08em", textTransform: "uppercase" }}>Member care portal</div>
         </div>
       </div>
       {role && (
@@ -349,11 +349,11 @@ function Landing({ setRole, setResidentId, data }) {
     <div>
       <p style={{ color: theme.inkSoft, fontSize: 15, marginBottom: 22, maxWidth: 480 }}>
         Select the option that applies to you.
-        {activeCount > 0 && ` ${activeCount} active resident${activeCount === 1 ? "" : "s"}.`}
+        {activeCount > 0 && ` ${activeCount} active member${activeCount === 1 ? "" : "s"}.`}
       </p>
       <div className="role-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        <RoleCard icon={<LogIn size={20} />} title="I'm a resident" desc="Submit an overnight request for program-team approval" onClick={() => setRole("resident")} />
-        <RoleCard icon={<PenLine size={20} />} title="New resident intake" desc="Complete your residency agreement and program commitments" onClick={() => setRole("intake")} accent />
+        <RoleCard icon={<PenLine size={20} />} title="New member intake" desc="Complete your occupancy agreement and program commitments" onClick={() => setRole("intake")} accent />
+        <RoleCard icon={<LogIn size={20} />} title="I'm a member" desc="Submit an overnight request for program-team approval" onClick={() => setRole("resident")} />
       </div>
     </div>
   );
@@ -418,13 +418,14 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
             Your requested Room {form.room}, Bed {form.bed} assignment will be confirmed by the program team. We will email {form.email || "you"} once a decision is made.
           </p>
           <div style={{ display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap" }}><button onClick={() => window.print()} style={btnSecondary}>Print / save intake copy</button><button onClick={onDone} style={btnPrimary}>Back to home</button></div>
+          <PayPalFeeButton />
         </div>
       </Panel>
     );
   }
 
   return (
-    <Panel title="New resident intake" subtitle="Complete the occupancy agreement and record the resident's room and bed assignment.">
+    <Panel title="New member intake" subtitle="Complete the occupancy agreement and record the member's room and bed assignment.">
       <Field label="Full name">
         <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={input} placeholder="Jordan Reyes" />
       </Field>
@@ -480,18 +481,18 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
       <div style={{ background: theme.amberSoft, border: `1px solid ${theme.amber}33`, borderRadius: 10, padding: "0.95rem 1rem", margin: "1rem 0", fontSize: 13, color: theme.ink, lineHeight: 1.6 }}>
         <strong style={{ display: "block", marginBottom: 6 }}>Important occupancy and payment terms</strong>
         <ul style={{ margin: 0, paddingLeft: 20 }}>
-          <li>This occupancy agreement may be terminated if a resident's conduct creates an environment that other residents reasonably experience as unwelcoming.</li>
-          <li>Conduct that disrupts another resident's stay or the shared living environment may result in corrective action or termination of occupancy, subject to applicable law and program policy.</li>
+          <li>This occupancy agreement may be terminated if a member's conduct creates an environment that other members reasonably experience as unwelcoming.</li>
+          <li>Conduct that disrupts another member's stay or the shared living environment may result in corrective action or termination of occupancy, subject to applicable law and program policy.</li>
           <li>All payments are non-refundable.</li>
-          <li>A $200 administrative fee is required and is non-refundable.</li>
-          <li>Funds must be paid by cash, business check made payable to Ashrei Impact Foundation, or an online payment platform once provided by the program.</li>
-          <li>Residents who plan to move out must provide at least 30 days' written notice. When an eviction process applies, the notice period may range from 3 to 30 days as required by applicable law and the formal notice.</li>
+          <li>A $100 administrative/application fee is required and is non-refundable.</li>
+          <li>Funds must be paid by cash, business check made payable to Ashrei Impact Foundation, or PayPal using the button below.</li>
+          <li>Members who plan to move out must provide at least 30 days' written notice. When an eviction process applies, the notice period may range from 3 to 30 days as required by applicable law and the formal notice.</li>
         </ul>
       </div>
       <CheckField label="I have read, understand, and agree to the occupancy and payment terms above" checked={agreeOccupancyTerms} onChange={setAgreeOccupancyTerms} />
       <div style={{ background: theme.primarySoft, borderRadius: 10, padding: "0.95rem 1rem", margin: "1rem 0", fontSize: 13, lineHeight: 1.6 }}>
         <strong style={{ display: "block", marginBottom: 6 }}>Program standards acknowledgment</strong>
-        I understand this is a clean and sober, faith-centered shared living environment. Alcohol and illegal drugs are not allowed onsite. Cigarettes may not be smoked anywhere around the house; smoking is permitted only down at the street. I agree to comply with sober-living safety rules, mandatory and random drug/alcohol testing, curfew and pre-approved overnight requirements, visitor limits, resident privacy, maintenance reporting, and the grievance process. I understand serious or repeated unsafe conduct may result in corrective action or program discharge, subject to applicable law and program policy.
+        I understand this is a clean and sober, faith-centered shared living environment. Alcohol and illegal drugs are not allowed onsite. Cigarettes may not be smoked anywhere around the house; smoking is permitted only down at the street. I agree to comply with sober-living safety rules, mandatory and random drug/alcohol testing, curfew and pre-approved overnight requirements, visitor limits, member privacy, maintenance reporting, and the grievance process. I understand serious or repeated unsafe conduct may result in corrective action or program discharge, subject to applicable law and program policy.
       </div>
       <CheckField label="I have reviewed and agree to the House Rules, safety standards, testing, curfew/overnight, visitor, maintenance, grievance, privacy, and program-discharge policies" checked={agreeProgramStandards} onChange={setAgreeProgramStandards} />
       <CheckField label="By checking this box, I acknowledge there will be a curse jar and I am willing to participate by placing $1 in the jar if I curse or act unruly toward another house guest" checked={agreeCurseJar} onChange={setAgreeCurseJar} />
@@ -512,7 +513,17 @@ function Intake({ data, persist, addAudit, addNotification, onDone }) {
       <button disabled={!canSubmit || submitting} onClick={submit} style={canSubmit && !submitting ? btnPrimary : btnDisabled}>
         {submitting ? "Submitting securely…" : "Sign and submit"}
       </button>
+      <PayPalFeeButton />
     </Panel>
+  );
+}
+
+function PayPalFeeButton() {
+  return (
+    <div style={{ marginTop: 16 }}>
+      <a href="https://www.paypal.me/AIF201" target="_blank" rel="noopener noreferrer" style={{ ...btnSecondary, display: "inline-block", textDecoration: "none" }}>Pay $100 administrative/application fee with PayPal</a>
+      <p style={{ color: theme.inkSoft, fontSize: 12, margin: "8px 0 0" }}>PayPal opens in a new tab. Enter $100 and include your full name with the payment.</p>
+    </div>
   );
 }
 
@@ -713,12 +724,12 @@ function TodayTab({ data }) {
   return (
     <div>
       <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
-        <StatCard label="Active residents" value={active.length} />
+        <StatCard label="Active members" value={active.length} />
         <StatCard label="Checked in now" value={rows.filter(r => r.last?.type === "in").length} />
         <StatCard label="Late arrivals today" value={lateToday.length} tone={lateToday.length ? "amber" : "accent"} />
       </div>
-      <Panel title="Resident status">
-        {rows.length === 0 ? <EmptyState text="No active residents yet." /> : (
+      <Panel title="Member status">
+        {rows.length === 0 ? <EmptyState text="No active members yet." /> : (
           <div style={{ display: "grid", gap: 6 }}>
             {rows.map(({ tenant, last }) => (
               <div key={tenant.id} style={listRow}>
@@ -741,7 +752,7 @@ function TodayTab({ data }) {
 
 function MaintenanceTab({ data }) {
   const requests = (data.maintenance || []).sort((a, b) => b.createdAt - a.createdAt);
-  return <Panel title="Maintenance requests" subtitle="Emergency issues should be handled immediately; residents must not attempt unauthorized repairs.">
+  return <Panel title="Maintenance requests" subtitle="Emergency issues should be handled immediately; members must not attempt unauthorized repairs.">
     {requests.length === 0 ? <EmptyState text="No maintenance requests have been submitted." /> : <div style={{ display: "grid", gap: 8 }}>{requests.map(r => <div key={r.id} style={{ ...listRow, alignItems: "flex-start", flexDirection: "column", gap: 4 }}><strong>{r.priority.toUpperCase()} · {r.location}</strong><span>{r.description}</span><span style={{ fontSize: 12, color: theme.inkSoft }}>{fmtTime(r.createdAt)} · Status: {r.status}</span></div>)}</div>}
   </Panel>;
 }
@@ -749,7 +760,7 @@ function MaintenanceTab({ data }) {
 function HouseReportsTab({ data }) {
   const daily = (data.dailyReports || []).sort((a, b) => b.createdAt - a.createdAt);
   const incidents = (data.incidentReports || []).sort((a, b) => b.createdAt - a.createdAt);
-  const ReportRows = ({ reports, empty }) => reports.length === 0 ? <EmptyState text={empty} /> : <div style={{ display: "grid", gap: 8 }}>{reports.map(r => <div key={r.id} style={{ ...listRow, alignItems: "flex-start", flexDirection: "column", gap: 4 }}><strong>{r.managerName} · {fmtTime(r.createdAt)}</strong><span style={{ whiteSpace: "pre-wrap" }}>{r.summary}</span>{r.residents && <span style={{ fontSize: 12, color: theme.inkSoft }}>Residents involved: {r.residents}</span>}</div>)}</div>;
+  const ReportRows = ({ reports, empty }) => reports.length === 0 ? <EmptyState text={empty} /> : <div style={{ display: "grid", gap: 8 }}>{reports.map(r => <div key={r.id} style={{ ...listRow, alignItems: "flex-start", flexDirection: "column", gap: 4 }}><strong>{r.managerName} · {fmtTime(r.createdAt)}</strong><span style={{ whiteSpace: "pre-wrap" }}>{r.summary}</span>{r.residents && <span style={{ fontSize: 12, color: theme.inkSoft }}>Members involved: {r.residents}</span>}</div>)}</div>;
   return <div><Panel title="Daily reports" subtitle="Submitted by the House Manager for Owner review."><ReportRows reports={daily} empty="No daily reports submitted." /></Panel><Panel title="Incident reports" subtitle="Document facts, actions taken, and items requiring Owner follow-up."><ReportRows reports={incidents} empty="No incident reports submitted." /></Panel></div>;
 }
 
@@ -769,7 +780,7 @@ function HouseManagerPortal() {
     } catch (error) { setStatus(error.message || "Report could not be submitted."); }
   };
   const ready = code && form.managerName && form.summary;
-  return <div><div style={{ display: "flex", gap: 8, marginBottom: 16 }}><button onClick={() => setTab("daily")} style={tab === "daily" ? tabActive : tabInactive}>Daily report</button><button onClick={() => setTab("incident")} style={tab === "incident" ? tabActive : tabInactive}>Incident report</button></div><Panel title={tab === "daily" ? "House Manager daily report" : "House Manager incident report"} subtitle="This private submission goes directly to the Owner workspace. Do not include information that is not necessary for program follow-up."><Field label="House Manager access code"><input type="password" value={code} onChange={e => setCode(e.target.value)} style={input} /></Field><Field label="Your name"><input value={form.managerName} onChange={e => setForm({ ...form, managerName: e.target.value })} style={input} /></Field><Field label="Residents involved (if applicable)"><input value={form.residents} onChange={e => setForm({ ...form, residents: e.target.value })} style={input} /></Field><Field label={tab === "daily" ? "Daily report" : "What happened?"}><textarea value={form.summary} onChange={e => setForm({ ...form, summary: e.target.value })} style={{ ...input, minHeight: 110, resize: "vertical" }} /></Field><Field label="Action taken / Owner follow-up needed (optional)"><textarea value={form.actionTaken} onChange={e => setForm({ ...form, actionTaken: e.target.value })} style={{ ...input, minHeight: 76, resize: "vertical" }} /></Field><button onClick={submit} disabled={!ready} style={ready ? btnPrimary : btnDisabled}>Send report to Owner</button>{status && <p style={{ color: theme.inkSoft, fontSize: 13 }}>{status}</p>}</Panel></div>;
+  return <div><div style={{ display: "flex", gap: 8, marginBottom: 16 }}><button onClick={() => setTab("daily")} style={tab === "daily" ? tabActive : tabInactive}>Daily report</button><button onClick={() => setTab("incident")} style={tab === "incident" ? tabActive : tabInactive}>Incident report</button></div><Panel title={tab === "daily" ? "House Manager daily report" : "House Manager incident report"} subtitle="This private submission goes directly to the Owner workspace. Do not include information that is not necessary for program follow-up."><Field label="House Manager access code"><input type="password" value={code} onChange={e => setCode(e.target.value)} style={input} /></Field><Field label="Your name"><input value={form.managerName} onChange={e => setForm({ ...form, managerName: e.target.value })} style={input} /></Field><Field label="Members involved (if applicable)"><input value={form.residents} onChange={e => setForm({ ...form, residents: e.target.value })} style={input} /></Field><Field label={tab === "daily" ? "Daily report" : "What happened?"}><textarea value={form.summary} onChange={e => setForm({ ...form, summary: e.target.value })} style={{ ...input, minHeight: 110, resize: "vertical" }} /></Field><Field label="Action taken / Owner follow-up needed (optional)"><textarea value={form.actionTaken} onChange={e => setForm({ ...form, actionTaken: e.target.value })} style={{ ...input, minHeight: 76, resize: "vertical" }} /></Field><button onClick={submit} disabled={!ready} style={ready ? btnPrimary : btnDisabled}>Send report to Owner</button>{status && <p style={{ color: theme.inkSoft, fontSize: 13 }}>{status}</p>}</Panel></div>;
 }
 
 function ResidentOvernightRequest() {
@@ -875,14 +886,14 @@ function AssignmentsTab({ data, persist, addAudit }) {
   };
 
   return (
-    <Panel title="Room and bed assignments" subtitle="Four rooms with two beds each. Duplicate assignments and rooms over two residents are blocked.">
+    <Panel title="Room and bed assignments" subtitle="Four rooms with two beds each. Duplicate assignments and rooms over two members are blocked.">
       <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
         <StatCard label="Total beds" value={totalBeds} />
         <StatCard label="Occupied beds" value={assignedBeds} />
         <StatCard label="Available beds" value={Math.max(0, totalBeds - assignedBeds)} tone="amber" />
       </div>
       {message && <div role="status" style={{ background: theme.primarySoft, color: theme.primary, padding: "0.65rem 0.8rem", borderRadius: 8, fontSize: 13, marginBottom: 12 }}>{message}</div>}
-      {active.length === 0 ? <EmptyState text="No active residents yet." /> : (
+      {active.length === 0 ? <EmptyState text="No active members yet." /> : (
         <div style={{ display: "grid", gap: 10 }}>
           {active.map(tenant => {
             const assignment = assignments[tenant.id] || { room: "", bed: "" };
@@ -936,7 +947,7 @@ function IntakeApprovalsTab({ data, persist, addAudit, addNotification }) {
 
   return (
     <div>
-      <Panel title="Pending intake applications" subtitle="Approve an application to activate the resident and confirm their room and bed assignment.">
+      <Panel title="Pending intake applications" subtitle="Approve an application to activate the member and confirm their room and bed assignment.">
         {pending.length === 0 ? <EmptyState text="No intake applications are waiting for review." /> : (
           <div style={{ display: "grid", gap: 10 }}>
             {pending.map(applicant => (
@@ -1107,7 +1118,7 @@ function CommsTab({ data, persist, addAudit, addNotification }) {
     next.tenants.filter(t => t.active).forEach(t => {
       addNotification(next, t.phone || t.name, "sms", `Reminder: scheduled check-in this week, ${t.name}. Reply when you're in for the night. (Simulated SMS.)`);
     });
-    addAudit(next, data.settings.managerName, "weekly_reminders_sent", `Sent to ${next.tenants.filter(t => t.active).length} residents.`);
+    addAudit(next, data.settings.managerName, "weekly_reminders_sent", `Sent to ${next.tenants.filter(t => t.active).length} members.`);
     await persist(next);
   };
 
@@ -1118,7 +1129,7 @@ function CommsTab({ data, persist, addAudit, addNotification }) {
     (picked.length ? picked : activeT.slice(0, 1)).forEach(t => {
       addNotification(next, t.phone || t.name, "sms", `Random test notice for ${t.name}: report for testing today. (Simulated SMS.)`);
     });
-    addAudit(next, data.settings.managerName, "random_test_triggered", `Notified ${picked.length || 1} resident(s).`);
+    addAudit(next, data.settings.managerName, "random_test_triggered", `Notified ${picked.length || 1} member(s).`);
     await persist(next);
   };
 

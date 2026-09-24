@@ -27,7 +27,7 @@ export default async function handler(req, res) {
       if (!name || !phone || !location || !description) return res.status(400).json({ error: "Please complete the required maintenance request fields." });
       const data = (await readState()) || structuredClone(EMPTY_STATE);
       const tenant = data.tenants.find(t => t.active && t.name.toLowerCase() === name.toLowerCase() && t.phone.replace(/\D/g, "").slice(-4) === phone.replace(/\D/g, "").slice(-4));
-      if (!tenant) return res.status(400).json({ error: "We could not verify an active resident using that name and phone number. Please contact the program coordinator." });
+      if (!tenant) return res.status(400).json({ error: "We could not verify an active member using that name and phone number. Please contact the program coordinator." });
       const createdAt = Date.now();
       data.maintenance = data.maintenance || [];
       data.maintenance.unshift({ id: id(), tenantId: tenant.id, location, priority: clean(body.priority) || "routine", description, status: "reported", createdAt });
@@ -42,9 +42,9 @@ export default async function handler(req, res) {
       if (new Date(returnDate) < new Date(requestedDate)) return res.status(400).json({ error: "Your return date must be after your leaving date." });
       const data = (await readState()) || structuredClone(EMPTY_STATE);
       const tenant = data.tenants.find(t => t.active && t.name.toLowerCase() === name.toLowerCase() && t.phone.replace(/\D/g, "").slice(-4) === phone.replace(/\D/g, "").slice(-4));
-      if (!tenant) return res.status(400).json({ error: "We could not verify an active resident using that name and phone number. Please contact the program coordinator." });
+      if (!tenant) return res.status(400).json({ error: "We could not verify an active member using that name and phone number. Please contact the program coordinator." });
       const daysIn = Math.floor((Date.now() - tenant.admissionDate) / 86400000);
-      if (daysIn <= 10 || !tenant.consentDrugTest) return res.status(400).json({ error: "This resident is not currently eligible for an overnight request. Please contact the program coordinator." });
+      if (daysIn <= 10 || !tenant.consentDrugTest) return res.status(400).json({ error: "This member is not currently eligible for an overnight request. Please contact the program coordinator." });
       const createdAt = Date.now();
       data.requests.unshift({ id: id(), tenantId: tenant.id, requestedDate, returnDate, destination, address, hostName, hostRelationship, reason, status: "pending", createdAt, decidedAt: null, decidedBy: null, testRequired: true, testResult: null, eligibleAtRequest: true });
       data.auditLog.unshift({ id: id(), timestamp: createdAt, actor: tenant.name, action: "overnight_requested", detail: `Requested overnight ${requestedDate} to ${returnDate}.` });
@@ -56,7 +56,7 @@ export default async function handler(req, res) {
     if (!name || !phone || !room || !bed || !body.agreementAccepted || !body.screeningAccurate) return res.status(400).json({ error: "Please complete the required application fields and agreement." });
     const data = (await readState()) || structuredClone(EMPTY_STATE);
     const submittedAt = Date.now();
-    const tenant = { id: id(), name, phone, email: clean(body.email), room, bed, admissionDate: new Date(body.admissionDate || submittedAt).getTime(), active: false, approvalStatus: "pending", submittedAt, leaseSigned: true, signedAt: submittedAt, consentDrugTest: Boolean(body.consentDrugTest), occupancyTermsAccepted: true, programStandardsAccepted: Boolean(body.programStandardsAccepted), moveInHygieneAccepted: Boolean(body.moveInHygieneAccepted), curseJarAccepted: Boolean(body.curseJarAccepted), screening: body.screening || {}, screeningAccurate: true, administrativeFee: 200, paymentsNonRefundable: true };
+    const tenant = { id: id(), name, phone, email: clean(body.email), room, bed, admissionDate: new Date(body.admissionDate || submittedAt).getTime(), active: false, approvalStatus: "pending", submittedAt, leaseSigned: true, signedAt: submittedAt, consentDrugTest: Boolean(body.consentDrugTest), occupancyTermsAccepted: true, programStandardsAccepted: Boolean(body.programStandardsAccepted), moveInHygieneAccepted: Boolean(body.moveInHygieneAccepted), curseJarAccepted: Boolean(body.curseJarAccepted), screening: body.screening || {}, screeningAccurate: true, administrativeFee: 100, paymentsNonRefundable: true };
     data.tenants.push(tenant);
     data.auditLog.unshift({ id: id(), timestamp: submittedAt, actor: name, action: "intake_submitted", detail: `Submitted for approval. Requested Room ${room}, Bed ${bed}.` });
     await writeState(data);
