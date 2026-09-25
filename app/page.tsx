@@ -351,9 +351,18 @@ function Landing({ setRole, setResidentId, data }) {
         Select the option that applies to you.
         {activeCount > 0 && ` ${activeCount} active member${activeCount === 1 ? "" : "s"}.`}
       </p>
-      <div className="role-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        <RoleCard icon={<PenLine size={20} />} title="Ashrei New Member Intake" desc="Complete your occupancy agreement and program commitments" onClick={() => setRole("intake")} accent />
-        <RoleCard icon={<LogIn size={20} />} title="I am a member at Ashrei currently" desc="Submit an overnight request for program-team approval" onClick={() => setRole("resident")} />
+      <div className="welcome-grid">
+        <img
+          className="welcome-art"
+          src="/bird-pepper-place-art.jpg"
+          alt="Bird Pepper Place artwork with a dove and the Austin skyline"
+          width={884}
+          height={884}
+        />
+        <div className="welcome-options">
+          <RoleCard icon={<PenLine size={20} />} title="Ashrei New Member Intake" desc="Complete your occupancy agreement and program commitments" onClick={() => setRole("intake")} accent />
+          <RoleCard icon={<LogIn size={20} />} title="I am a member at Ashrei currently" desc="Submit an overnight request for program-team approval" onClick={() => setRole("resident")} />
+        </div>
       </div>
     </div>
   );

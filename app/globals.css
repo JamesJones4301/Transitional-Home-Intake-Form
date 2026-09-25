@@ -89,6 +89,30 @@ button { transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms 
 button:not(:disabled):hover { transform: translateY(-1px); box-shadow: 0 7px 20px rgb(23 76 60 / 10%); }
 button:focus-visible, input:focus-visible { outline: 3px solid rgb(196 147 66 / 35%); outline-offset: 2px; }
 
+.welcome-grid {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 18px;
+  align-items: stretch;
+}
+.welcome-art {
+  width: 220px;
+  height: 220px;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+}
+.welcome-options {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+@media (max-width: 640px) {
+  .welcome-grid { grid-template-columns: 1fr; justify-items: center; }
+  .welcome-art { width: 180px; height: 180px; }
+  .welcome-options { width: 100%; }
+}
+
 @media (max-width: 640px) {
   .role-grid, .two-col-grid, .stats-grid, .report-grid, .curfew-grid, .assignment-row { grid-template-columns: 1fr !important; }
   .action-row { flex-direction: column; }
