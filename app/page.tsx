@@ -265,6 +265,8 @@ export default function App() {
           />
         )}
         {role === "houseManager" && <HouseManagerPortal />}
+        {role === "houseManagerOwner" && !googleAccessToken && <GoogleSheetAccess onConnect={connectGoogle} status={syncStatus} />}
+        {role === "houseManagerOwner" && googleAccessToken && <HouseManagerPortal ownerToken={googleAccessToken} />}
         {role === "ownerMenu" && !googleAccessToken && (
           <GoogleSheetAccess onConnect={connectGoogle} status={syncStatus} />
         )}
@@ -308,7 +310,8 @@ function OwnerMenu({ setRole }) {
       </p>
       <div className="role-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         <RoleCard icon={<ClipboardList size={20} />} title="Program team" desc="Review requests, monitor check-ins, run reports" onClick={() => setRole("manager")} />
-        <RoleCard icon={<TrendingUp size={20} />} title="Foundation leadership" desc="Read-only view of program reports" onClick={() => setRole("owner")} />
+        <RoleCard icon={<TrendingUp size={20} />} title="Foundation leadership" desc="View charts and program reports" onClick={() => setRole("owner")} />
+        <RoleCard icon={<FileText size={20} />} title="Staff forms and reports" desc="Open the three staff tools with your verified owner email" onClick={() => setRole("houseManagerOwner")} />
       </div>
     </div>
   );
@@ -627,23 +630,45 @@ function StaffRecordsTab({ data }) {
   </Panel>;
 }
 
-function HouseManagerPortal() {
+function HouseManagerPortal({ ownerToken = null }) {
   const [tab, setTab] = useState("daily");
   const [code, setCode] = useState("");
+  const [verifiedCode, setVerifiedCode] = useState("");
+  const [checkingCode, setCheckingCode] = useState(false);
+  const [accessError, setAccessError] = useState("");
   const [form, setForm] = useState({ managerName: "", residents: "", summary: "", actionTaken: "" });
   const [status, setStatus] = useState("");
+  const unlock = async event => {
+    event.preventDefault();
+    setAccessError(""); setCheckingCode(true);
+    try {
+      const response = await fetch("/api/staff-access", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accessCode: code }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "The code could not be verified.");
+      setVerifiedCode(code);
+      setCode("");
+    } catch (error) { setAccessError(error.message || "The code could not be verified."); }
+    finally { setCheckingCode(false); }
+  };
+  if (!ownerToken && !verifiedCode) return <Panel title="Authorized staff access" subtitle="Enter your assigned code to unlock the daily report, incident report, and staff forms.">
+    <form onSubmit={unlock}>
+      <Field label="Staff access code"><input type="password" inputMode="numeric" autoComplete="off" value={code} onChange={e => setCode(e.target.value)} style={input} /></Field>
+      <button type="submit" disabled={!code || checkingCode} style={code && !checkingCode ? btnPrimary : btnDisabled}>{checkingCode ? "Checking…" : "Unlock staff tools"}</button>
+      {accessError && <p role="alert" style={{ color: theme.red, fontSize: 13 }}>{accessError}</p>}
+    </form>
+  </Panel>;
   const submit = async () => {
     setStatus("Submitting…");
     try {
-      const response = await fetch("/api/public-submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: tab === "daily" ? "manager-daily" : "manager-incident", accessCode: code, ...form }) });
+      const response = await fetch("/api/public-submit", { method: "POST", headers: { "Content-Type": "application/json", ...(ownerToken ? { Authorization: `Bearer ${ownerToken}` } : {}) }, body: JSON.stringify({ type: tab === "daily" ? "manager-daily" : "manager-incident", accessCode: verifiedCode, ...form }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Report could not be submitted.");
       setStatus("Report sent securely to the Owner workspace.");
       setForm({ managerName: form.managerName, residents: "", summary: "", actionTaken: "" });
     } catch (error) { setStatus(error.message || "Report could not be submitted."); }
   };
-  const ready = code && form.managerName && form.summary;
-  return <div><div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}><button onClick={() => setTab("daily")} style={tab === "daily" ? tabActive : tabInactive}>Daily report</button><button onClick={() => setTab("incident")} style={tab === "incident" ? tabActive : tabInactive}>Incident report</button><button onClick={() => setTab("staff")} style={tab === "staff" ? tabActive : tabInactive}>Staff forms</button></div>{tab === "staff" ? <StaffForms /> : <Panel title={tab === "daily" ? "House Manager daily report" : "House Manager incident report"} subtitle="This private submission goes directly to the Owner workspace. Do not include information that is not necessary for program follow-up."><Field label="House Manager access code"><input type="password" value={code} onChange={e => setCode(e.target.value)} style={input} /></Field><Field label="Your name"><input value={form.managerName} onChange={e => setForm({ ...form, managerName: e.target.value })} style={input} /></Field><Field label="Participants involved (if applicable)"><input value={form.residents} onChange={e => setForm({ ...form, residents: e.target.value })} style={input} /></Field><Field label={tab === "daily" ? "Daily report" : "What happened?"}><textarea value={form.summary} onChange={e => setForm({ ...form, summary: e.target.value })} style={{ ...input, minHeight: 110, resize: "vertical" }} /></Field><Field label="Action taken / Owner follow-up needed (optional)"><textarea value={form.actionTaken} onChange={e => setForm({ ...form, actionTaken: e.target.value })} style={{ ...input, minHeight: 76, resize: "vertical" }} /></Field><button onClick={submit} disabled={!ready} style={ready ? btnPrimary : btnDisabled}>Send report to Owner</button>{status && <p style={{ color: theme.inkSoft, fontSize: 13 }}>{status}</p>}</Panel>}</div>;
+  const ready = form.managerName && form.summary;
+  return <div><div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}><button onClick={() => setTab("daily")} style={tab === "daily" ? tabActive : tabInactive}>Daily report</button><button onClick={() => setTab("incident")} style={tab === "incident" ? tabActive : tabInactive}>Incident report</button><button onClick={() => setTab("staff")} style={tab === "staff" ? tabActive : tabInactive}>Staff forms</button>{!ownerToken && <button onClick={() => { setVerifiedCode(""); setTab("daily"); }} style={tabInactive}>Lock staff tools</button>}</div>{tab === "staff" ? <StaffForms accessCode={verifiedCode} ownerToken={ownerToken} /> : <Panel title={tab === "daily" ? "House Manager daily report" : "House Manager incident report"} subtitle="This private submission goes directly to the Owner workspace. Do not include information that is not necessary for program follow-up."><Field label="Your name"><input value={form.managerName} onChange={e => setForm({ ...form, managerName: e.target.value })} style={input} /></Field><Field label="Participants involved (if applicable)"><input value={form.residents} onChange={e => setForm({ ...form, residents: e.target.value })} style={input} /></Field><Field label={tab === "daily" ? "Daily report" : "What happened?"}><textarea value={form.summary} onChange={e => setForm({ ...form, summary: e.target.value })} style={{ ...input, minHeight: 110, resize: "vertical" }} /></Field><Field label="Action taken / Owner follow-up needed (optional)"><textarea value={form.actionTaken} onChange={e => setForm({ ...form, actionTaken: e.target.value })} style={{ ...input, minHeight: 76, resize: "vertical" }} /></Field><button onClick={submit} disabled={!ready} style={ready ? btnPrimary : btnDisabled}>Send report to Owner</button>{status && <p role="status" style={{ color: theme.inkSoft, fontSize: 13 }}>{status}</p>}</Panel>}</div>;
 }
 
 function ResidentOvernightRequest() {
@@ -982,7 +1007,10 @@ function ReportsTab({ data }) {
 
   return (
     <div>
-      <Panel title="Reports for foundation leadership" subtitle="Pulled live from the check-in and request history — nothing to compile by hand.">
+      <Panel title="Program activity charts" subtitle="Activity is grouped by the date recorded in your browser. The request chart covers the last 30 days.">
+        <ReportCharts data={data} />
+      </Panel>
+      <Panel title="Reports for foundation leadership" subtitle="Pulled live from the check-in and request history.">
         <ReportBlock label="Daily" r={daily} />
         <ReportBlock label="Weekly" r={weekly} />
         <ReportBlock label="Monthly" r={monthly} />
@@ -992,6 +1020,36 @@ function ReportsTab({ data }) {
       </Panel>
     </div>
   );
+}
+
+function ReportCharts({ data }) {
+  const now = new Date();
+  const days = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (6 - index));
+    const key = date.toDateString();
+    return { label: date.toLocaleDateString(undefined, { weekday: "short" }), checkins: data.checkins.filter(item => new Date(item.timestamp).toDateString() === key).length, requests: data.requests.filter(item => new Date(item.createdAt).toDateString() === key).length };
+  });
+  const scale = Math.max(1, ...days.flatMap(day => [day.checkins, day.requests]));
+  const recent = data.requests.filter(item => item.createdAt >= Date.now() - 30 * 86400000);
+  const outcomes = [
+    { label: "Approved", count: recent.filter(item => item.status === "approved").length, color: theme.primary },
+    { label: "Pending", count: recent.filter(item => item.status === "pending").length, color: theme.accent },
+    { label: "Denied", count: recent.filter(item => item.status === "denied").length, color: theme.red },
+  ];
+  const outcomeScale = Math.max(1, ...outcomes.map(item => item.count));
+  return <div className="report-charts">
+    <div><h3>Last 7 days</h3><p className="chart-legend"><span className="chart-dot chart-checkin" /> Check-ins <span className="chart-dot chart-request" /> Overnight requests</p>
+      <div className="chart-days">{days.map((day, index) => <div className="chart-day" key={index} aria-label={`${day.label}: ${day.checkins} check-ins, ${day.requests} overnight requests`}>
+        <div className="chart-columns"><span style={{ height: `${Math.max(day.checkins ? 6 : 0, day.checkins / scale * 100)}%`, background: theme.primary }} /><span style={{ height: `${Math.max(day.requests ? 6 : 0, day.requests / scale * 100)}%`, background: theme.accent }} /></div>
+        <strong>{day.label}</strong><small>{day.checkins} / {day.requests}</small>
+      </div>)}</div>
+    </div>
+    <div><h3>Overnight request outcomes</h3><p className="chart-legend">Last 30 days · {recent.length} total</p>
+      <div className="chart-outcomes">{outcomes.map(item => <div className="chart-outcome" key={item.label}>
+        <span>{item.label}</span><div className="chart-track"><span style={{ width: `${item.count / outcomeScale * 100}%`, background: item.color }} /></div><strong>{item.count}</strong>
+      </div>)}</div>
+    </div>
+  </div>;
 }
 
 function ReportBlock({ label, r }) {

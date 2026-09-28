@@ -75,9 +75,8 @@ export const STAFF_FORMS: Record<string, FormSpec> = {
 
 const inputStyle = { width: "100%", padding: "0.6rem 0.7rem", border: "1px solid #d8d7cf", borderRadius: 8, font: "inherit", boxSizing: "border-box" as const };
 
-export default function StaffForms() {
+export default function StaffForms({ accessCode, ownerToken }: { accessCode: string; ownerToken?: string | null }) {
   const [kind, setKind] = useState("violation");
-  const [accessCode, setAccessCode] = useState("");
   const [values, setValues] = useState<Record<string, string | string[]>>({});
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
@@ -85,11 +84,10 @@ export default function StaffForms() {
   function change(key: string, value: string | string[]) { setValues(previous => ({ ...previous, [key]: value })); }
   async function submit(event: React.FormEvent) {
     event.preventDefault(); setStatus("");
-    if (!accessCode.trim()) return setStatus("Enter the House Manager access code.");
     if (spec.fields.some(field => field.required && (Array.isArray(values[field.key]) ? !(values[field.key] as string[]).length : !String(values[field.key] || "").trim()))) return setStatus("Complete every required field.");
     setBusy(true);
     try {
-      const response = await fetch("/api/public-submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "staff-form", accessCode, formType: kind, fields: values }) });
+      const response = await fetch("/api/public-submit", { method: "POST", headers: { "Content-Type": "application/json", ...(ownerToken ? { Authorization: `Bearer ${ownerToken}` } : {}) }, body: JSON.stringify({ type: "staff-form", accessCode, formType: kind, fields: values }) });
       const result: any = await response.json();
       if (!response.ok) throw new Error(result.error || "The staff record could not be saved.");
       setStatus("Staff record saved to the restricted Owner workspace. Print or save a copy if a signed notice must be delivered.");
@@ -99,7 +97,6 @@ export default function StaffForms() {
   }
   return <div className="packet-shell"><div className="packet-section"><h2>Staff forms</h2>
     <p className="packet-note">For authorized staff. These records are separate from participant requests. Protect the access code and include only facts needed for the program record. Call emergency services for an immediate threat.</p>
-    <label className="packet-field"><span>House Manager access code</span><input type="password" autoComplete="off" value={accessCode} onChange={event => setAccessCode(event.target.value)} style={inputStyle} /></label>
     <label className="packet-field"><span>Select staff form</span><select value={kind} onChange={event => { setKind(event.target.value); setValues({}); setStatus(""); }} style={inputStyle}>{Object.entries(STAFF_FORMS).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}</select></label>
   </div><form onSubmit={submit} className="packet-form"><section className="packet-section"><h2>{spec.label}</h2><p className="packet-note">{spec.guidance}</p>
     {spec.fields.map(field => <label className="packet-field" key={field.key}><span>{field.label}{field.required ? " *" : ""}</span>
