@@ -791,9 +791,9 @@ function IntakeApprovalsTab({ data, persist, addAudit, addNotification }) {
     const next = JSON.parse(JSON.stringify(data));
     const record = next.tenants.find(t => t.id === applicant.id);
     if (status === "approved") {
-      const terms = finalTerms[record.id] || {};
+      const terms = { room: record.room, bed: record.bed, monthlyRate: record.monthlyRate, ...(finalTerms[record.id] || {}) };
       if (record.application) {
-        if (!terms.room?.trim() || !terms.bed?.trim() || !terms.programStartDate || !Number.isFinite(Number(terms.monthlyRate)) || Number(terms.monthlyRate) < 900 || terms.participantSignature?.trim().toLowerCase() !== record.name.trim().toLowerCase() || !terms.staffSignature?.trim()) {
+        if (!terms.room?.trim() || !terms.bed?.trim() || !terms.programStartDate || !Number.isFinite(Number(terms.monthlyRate)) || Number(terms.monthlyRate) < 900 || terms.participantSignature?.trim().replace(/\s+/g, " ").toLowerCase() !== record.name.trim().replace(/\s+/g, " ").toLowerCase() || !terms.staffSignature?.trim()) {
           window.alert("With the participant present, enter the confirmed room, bed, start date, monthly fee, participant signature, and Ashrei representative name before approval.");
           return;
         }
