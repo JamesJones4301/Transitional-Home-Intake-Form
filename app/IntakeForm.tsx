@@ -71,7 +71,7 @@ export default function IntakeForm({ onDone }: { onDone: () => void }) {
   return <div className="packet-shell">
     <header className="packet-header">
       <figure><img src="/bird-pepper-place-exterior.jpg" alt="Bird Pepper Place residence" /><figcaption>Bird Pepper Place, 2017 Cheshire Drive, Austin</figcaption></figure>
-      <div><h1>Ashrei New Member Intake</h1><p>Bird Pepper Place sober-living program, 2017 Cheshire Dr, Austin, TX 78723</p>
+      <div><h1>Ashrei New Participant Intake</h1><p>Bird Pepper Place sober-living program, 2017 Cheshire Dr, Austin, TX 78723</p>
         <p>Review each section below before signing. Ask Ashrei staff for a copy of the full program packet for your records.</p>
         <p className="packet-note">Submission does not guarantee admission or a bed assignment. Ashrei does not provide detoxification, medical care, medication administration, or clinical substance-use treatment.</p>
       </div>

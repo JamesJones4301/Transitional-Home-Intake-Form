@@ -234,7 +234,7 @@ export default function App() {
   if (loading || !data) {
     return (
       <div style={{ background: theme.bg, minHeight: 400, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui" }}>
-        <div style={{ color: theme.inkSoft }}>Loading member care workspace…</div>
+        <div style={{ color: theme.inkSoft }}>Loading participant care workspace…</div>
       </div>
     );
   }
@@ -290,7 +290,7 @@ export default function App() {
 
 function GoogleSheetAccess({ onConnect, status }) {
   return (
-    <Panel title="Owner verification required" subtitle="Member records and approval tools are restricted to the authorized Ashrei Impact Foundation Google account.">
+    <Panel title="Owner verification required" subtitle="Participant records and approval tools are restricted to the authorized Ashrei Impact Foundation Google account.">
       <div style={{ background: theme.primarySoft, borderRadius: 10, padding: "0.9rem 1rem", marginBottom: 14, fontSize: 13, lineHeight: 1.6 }}>
         Sign in as <strong>{GOOGLE_OWNER_EMAIL}</strong> to open the management workspace and synchronize changes with the private Google Sheet.
       </div>
@@ -322,7 +322,7 @@ function Header({ role, setRole, setResidentId }) {
         <img src="/ashrei-impact-logo.svg" alt="Ashrei Impact Foundation" style={{ width: 52, height: 52, objectFit: "contain", borderRadius: 8 }} />
         <div>
           <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 19 }}>Ashrei Impact Foundation</div>
-          <div style={{ fontSize: 10, color: theme.inkSoft, letterSpacing: "0.08em", textTransform: "uppercase" }}>Member care portal</div>
+          <div style={{ fontSize: 10, color: theme.inkSoft, letterSpacing: "0.08em", textTransform: "uppercase" }}>Participant care portal</div>
           <div className="portal-contact" onClick={event => event.stopPropagation()}><a href="mailto:ashreiimpactfoundation@gmail.com">ashreiimpactfoundation@gmail.com</a><a href="tel:+17373444075">737-344-4075</a></div>
         </div>
       </div>
@@ -342,7 +342,7 @@ function Landing({ setRole, setResidentId, data }) {
     <div>
       <p style={{ color: theme.inkSoft, fontSize: 15, marginBottom: 22, maxWidth: 480 }}>
         Select the option that applies to you.
-        {activeCount > 0 && ` ${activeCount} active member${activeCount === 1 ? "" : "s"}.`}
+        {activeCount > 0 && ` ${activeCount} active participant${activeCount === 1 ? "" : "s"}.`}
       </p>
       <div className="welcome-grid">
         <img
@@ -353,8 +353,8 @@ function Landing({ setRole, setResidentId, data }) {
           height={884}
         />
         <div className="welcome-options">
-          <RoleCard icon={<PenLine size={20} />} title="Ashrei New Member Intake" desc="Complete your occupancy agreement and program commitments" onClick={() => setRole("intake")} accent />
-          <RoleCard icon={<LogIn size={20} />} title="I am a member at Ashrei currently" desc="Submit an overnight request for program-team approval" onClick={() => setRole("resident")} />
+          <RoleCard icon={<PenLine size={20} />} title="Ashrei New Participant Intake" desc="Complete your occupancy agreement and program commitments" onClick={() => setRole("intake")} accent />
+          <RoleCard icon={<LogIn size={20} />} title="I am a participant at Ashrei currently" desc="Submit an overnight request for program-team approval" onClick={() => setRole("resident")} />
         </div>
       </div>
       <button onClick={() => setRole("houseManager")} style={{ border: 0, background: "none", color: theme.primary, cursor: "pointer", marginTop: 18, padding: 0, fontSize: 13 }}>Authorized staff forms and reports</button>
@@ -577,12 +577,12 @@ function TodayTab({ data }) {
   return (
     <div>
       <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
-        <StatCard label="Active members" value={active.length} />
+        <StatCard label="Active participants" value={active.length} />
         <StatCard label="Checked in now" value={rows.filter(r => r.last?.type === "in").length} />
         <StatCard label="Late arrivals today" value={lateToday.length} tone={lateToday.length ? "amber" : "accent"} />
       </div>
-      <Panel title="Member status">
-        {rows.length === 0 ? <EmptyState text="No active members yet." /> : (
+      <Panel title="Participant status">
+        {rows.length === 0 ? <EmptyState text="No active participants yet." /> : (
           <div style={{ display: "grid", gap: 6 }}>
             {rows.map(({ tenant, last }) => (
               <div key={tenant.id} style={listRow}>
@@ -605,7 +605,7 @@ function TodayTab({ data }) {
 
 function MaintenanceTab({ data }) {
   const requests = (data.maintenance || []).sort((a, b) => b.createdAt - a.createdAt);
-  return <Panel title="Maintenance requests" subtitle="Emergency issues should be handled immediately; members must not attempt unauthorized repairs.">
+  return <Panel title="Maintenance requests" subtitle="Emergency issues should be handled immediately; participants must not attempt unauthorized repairs.">
     {requests.length === 0 ? <EmptyState text="No maintenance requests have been submitted." /> : <div style={{ display: "grid", gap: 8 }}>{requests.map(r => <div key={r.id} style={{ ...listRow, alignItems: "flex-start", flexDirection: "column", gap: 4 }}><strong>{r.priority.toUpperCase()} · {r.location}</strong><span>{r.description}</span><span style={{ fontSize: 12, color: theme.inkSoft }}>{fmtTime(r.createdAt)} · Status: {r.status}</span></div>)}</div>}
   </Panel>;
 }
@@ -613,7 +613,7 @@ function MaintenanceTab({ data }) {
 function HouseReportsTab({ data }) {
   const daily = (data.dailyReports || []).sort((a, b) => b.createdAt - a.createdAt);
   const incidents = (data.incidentReports || []).sort((a, b) => b.createdAt - a.createdAt);
-  const ReportRows = ({ reports, empty }) => reports.length === 0 ? <EmptyState text={empty} /> : <div style={{ display: "grid", gap: 8 }}>{reports.map(r => <div key={r.id} style={{ ...listRow, alignItems: "flex-start", flexDirection: "column", gap: 4 }}><strong>{r.managerName} · {fmtTime(r.createdAt)}</strong><span style={{ whiteSpace: "pre-wrap" }}>{r.summary}</span>{r.residents && <span style={{ fontSize: 12, color: theme.inkSoft }}>Members involved: {r.residents}</span>}</div>)}</div>;
+  const ReportRows = ({ reports, empty }) => reports.length === 0 ? <EmptyState text={empty} /> : <div style={{ display: "grid", gap: 8 }}>{reports.map(r => <div key={r.id} style={{ ...listRow, alignItems: "flex-start", flexDirection: "column", gap: 4 }}><strong>{r.managerName} · {fmtTime(r.createdAt)}</strong><span style={{ whiteSpace: "pre-wrap" }}>{r.summary}</span>{r.residents && <span style={{ fontSize: 12, color: theme.inkSoft }}>Participants involved: {r.residents}</span>}</div>)}</div>;
   return <div><Panel title="Daily reports" subtitle="Submitted by the House Manager for Owner review."><ReportRows reports={daily} empty="No daily reports submitted." /></Panel><Panel title="Incident reports" subtitle="Document facts, actions taken, and items requiring Owner follow-up."><ReportRows reports={incidents} empty="No incident reports submitted." /></Panel></div>;
 }
 
@@ -643,7 +643,7 @@ function HouseManagerPortal() {
     } catch (error) { setStatus(error.message || "Report could not be submitted."); }
   };
   const ready = code && form.managerName && form.summary;
-  return <div><div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}><button onClick={() => setTab("daily")} style={tab === "daily" ? tabActive : tabInactive}>Daily report</button><button onClick={() => setTab("incident")} style={tab === "incident" ? tabActive : tabInactive}>Incident report</button><button onClick={() => setTab("staff")} style={tab === "staff" ? tabActive : tabInactive}>Staff forms</button></div>{tab === "staff" ? <StaffForms /> : <Panel title={tab === "daily" ? "House Manager daily report" : "House Manager incident report"} subtitle="This private submission goes directly to the Owner workspace. Do not include information that is not necessary for program follow-up."><Field label="House Manager access code"><input type="password" value={code} onChange={e => setCode(e.target.value)} style={input} /></Field><Field label="Your name"><input value={form.managerName} onChange={e => setForm({ ...form, managerName: e.target.value })} style={input} /></Field><Field label="Members involved (if applicable)"><input value={form.residents} onChange={e => setForm({ ...form, residents: e.target.value })} style={input} /></Field><Field label={tab === "daily" ? "Daily report" : "What happened?"}><textarea value={form.summary} onChange={e => setForm({ ...form, summary: e.target.value })} style={{ ...input, minHeight: 110, resize: "vertical" }} /></Field><Field label="Action taken / Owner follow-up needed (optional)"><textarea value={form.actionTaken} onChange={e => setForm({ ...form, actionTaken: e.target.value })} style={{ ...input, minHeight: 76, resize: "vertical" }} /></Field><button onClick={submit} disabled={!ready} style={ready ? btnPrimary : btnDisabled}>Send report to Owner</button>{status && <p style={{ color: theme.inkSoft, fontSize: 13 }}>{status}</p>}</Panel>}</div>;
+  return <div><div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}><button onClick={() => setTab("daily")} style={tab === "daily" ? tabActive : tabInactive}>Daily report</button><button onClick={() => setTab("incident")} style={tab === "incident" ? tabActive : tabInactive}>Incident report</button><button onClick={() => setTab("staff")} style={tab === "staff" ? tabActive : tabInactive}>Staff forms</button></div>{tab === "staff" ? <StaffForms /> : <Panel title={tab === "daily" ? "House Manager daily report" : "House Manager incident report"} subtitle="This private submission goes directly to the Owner workspace. Do not include information that is not necessary for program follow-up."><Field label="House Manager access code"><input type="password" value={code} onChange={e => setCode(e.target.value)} style={input} /></Field><Field label="Your name"><input value={form.managerName} onChange={e => setForm({ ...form, managerName: e.target.value })} style={input} /></Field><Field label="Participants involved (if applicable)"><input value={form.residents} onChange={e => setForm({ ...form, residents: e.target.value })} style={input} /></Field><Field label={tab === "daily" ? "Daily report" : "What happened?"}><textarea value={form.summary} onChange={e => setForm({ ...form, summary: e.target.value })} style={{ ...input, minHeight: 110, resize: "vertical" }} /></Field><Field label="Action taken / Owner follow-up needed (optional)"><textarea value={form.actionTaken} onChange={e => setForm({ ...form, actionTaken: e.target.value })} style={{ ...input, minHeight: 76, resize: "vertical" }} /></Field><button onClick={submit} disabled={!ready} style={ready ? btnPrimary : btnDisabled}>Send report to Owner</button>{status && <p style={{ color: theme.inkSoft, fontSize: 13 }}>{status}</p>}</Panel>}</div>;
 }
 
 function ResidentOvernightRequest() {
@@ -749,14 +749,14 @@ function AssignmentsTab({ data, persist, addAudit }) {
   };
 
   return (
-    <Panel title="Room and bed assignments" subtitle="Four rooms with two beds each. Duplicate assignments and rooms over two members are blocked.">
+    <Panel title="Room and bed assignments" subtitle="Four rooms with two beds each. Duplicate assignments and rooms over two participants are blocked.">
       <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
         <StatCard label="Total beds" value={totalBeds} />
         <StatCard label="Occupied beds" value={assignedBeds} />
         <StatCard label="Available beds" value={Math.max(0, totalBeds - assignedBeds)} tone="amber" />
       </div>
       {message && <div role="status" style={{ background: theme.primarySoft, color: theme.primary, padding: "0.65rem 0.8rem", borderRadius: 8, fontSize: 13, marginBottom: 12 }}>{message}</div>}
-      {active.length === 0 ? <EmptyState text="No active members yet." /> : (
+      {active.length === 0 ? <EmptyState text="No active participants yet." /> : (
         <div style={{ display: "grid", gap: 10 }}>
           {active.map(tenant => {
             const assignment = assignments[tenant.id] || { room: "", bed: "" };
@@ -1014,7 +1014,7 @@ function CommsTab({ data, persist, addAudit, addNotification }) {
     next.tenants.filter(t => t.active).forEach(t => {
       addNotification(next, t.phone || t.name, "sms", `Reminder: scheduled check-in this week, ${t.name}. Reply when you're in for the night. (Simulated SMS.)`);
     });
-    addAudit(next, data.settings.managerName, "weekly_reminders_sent", `Sent to ${next.tenants.filter(t => t.active).length} members.`);
+    addAudit(next, data.settings.managerName, "weekly_reminders_sent", `Sent to ${next.tenants.filter(t => t.active).length} participants.`);
     await persist(next);
   };
 
@@ -1025,7 +1025,7 @@ function CommsTab({ data, persist, addAudit, addNotification }) {
     (picked.length ? picked : activeT.slice(0, 1)).forEach(t => {
       addNotification(next, t.phone || t.name, "sms", `Random test notice for ${t.name}: report for testing today. (Simulated SMS.)`);
     });
-    addAudit(next, data.settings.managerName, "random_test_triggered", `Notified ${picked.length || 1} member(s).`);
+    addAudit(next, data.settings.managerName, "random_test_triggered", `Notified ${picked.length || 1} participant(s).`);
     await persist(next);
   };
 
