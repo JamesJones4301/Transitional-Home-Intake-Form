@@ -323,7 +323,7 @@ function Header({ role, setRole, setResidentId }) {
         <div>
           <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 19 }}>Ashrei Impact Foundation</div>
           <div style={{ fontSize: 10, color: theme.inkSoft, letterSpacing: "0.08em", textTransform: "uppercase" }}>Participant care portal</div>
-          <div className="portal-contact" onClick={event => event.stopPropagation()}><a href="mailto:ashreiimpactfoundation@gmail.com">ashreiimpactfoundation@gmail.com</a><a href="tel:+17373444075">737-344-4075</a></div>
+          <div className="portal-contact" onClick={event => event.stopPropagation()}><span><strong>Email:</strong> <a href="mailto:ashreiimpactfoundation@gmail.com">ashreiimpactfoundation@gmail.com</a></span><span><strong>Contact number:</strong> <a href="tel:+17373444075">737-344-4075</a></span></div>
         </div>
       </div>
       {role && (
