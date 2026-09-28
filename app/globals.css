@@ -94,12 +94,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgb(196 147 66 / 
 .portal-contact a:hover { text-decoration: underline; }
 
 .packet-shell { color: #22332d; }
-.packet-header { display: grid; grid-template-columns: 220px minmax(0, 1fr); column-gap: 20px; row-gap: 12px; align-items: start; margin-bottom: 20px; }
-.packet-header figure { margin: 0; }
+.packet-header { display: grid; grid-template-columns: minmax(0, 1fr) 220px; column-gap: 20px; row-gap: 8px; align-items: start; margin-bottom: 20px; }
+.packet-header figure { grid-column: 2; grid-row: 1 / span 2; margin: 0; }
 .packet-header img { width: 100%; height: 200px; object-fit: cover; border-radius: 12px; }
 .packet-header figcaption { color: #5c6963; font-size: 12px; line-height: 1.4; margin-top: 6px; }
-.packet-heading { padding-top: 2px; }
-.packet-intro { grid-column: 1 / -1; }
+.packet-heading { grid-column: 1; grid-row: 1; padding-top: 2px; }
+.packet-intro { grid-column: 1; grid-row: 2; }
 .packet-header h1 { font-family: Fraunces, Georgia, serif; font-size: 26px; line-height: 1.2; margin: 0 0 8px; }
 .packet-header p { margin: 6px 0; font-size: 14px; line-height: 1.55; }
 .packet-intro p:first-child { margin-top: 0; }
@@ -156,6 +156,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgb(196 147 66 / 
 @media (max-width: 640px) {
   .portal-header { flex-wrap: wrap; }
   .packet-header, .packet-two, .packet-schedule, .staff-record-details { grid-template-columns: 1fr; }
+  .packet-header figure, .packet-heading, .packet-intro { grid-column: 1; grid-row: auto; }
   .packet-header img { height: 160px; }
   .packet-section { padding: 17px; }
   .welcome-grid { grid-template-columns: 1fr; justify-items: center; }
