@@ -354,7 +354,7 @@ function Landing({ setRole, setResidentId, data }) {
         />
         <div className="welcome-options">
           <RoleCard icon={<PenLine size={20} />} title="Ashrei New Participant Intake" desc="Complete your occupancy agreement and program commitments" onClick={() => setRole("intake")} accent />
-          <RoleCard icon={<LogIn size={20} />} title="I am a participant at Ashrei currently" desc="Submit an overnight request for program-team approval" onClick={() => setRole("resident")} />
+          <RoleCard icon={<LogIn size={20} />} title="I am a participant at Ashrei currently" desc="Submit ongoing requests to the program team" onClick={() => setRole("resident")} />
         </div>
       </div>
       <button onClick={() => setRole("houseManager")} style={{ border: 0, background: "none", color: theme.primary, cursor: "pointer", marginTop: 18, padding: 0, fontSize: 13 }}>Authorized staff forms and reports</button>
