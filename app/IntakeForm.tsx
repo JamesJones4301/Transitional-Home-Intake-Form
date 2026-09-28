@@ -5,7 +5,7 @@ import React, { useState } from "react";
 const PACKET_VERSION = "Client View, September 28, 2026 (SL.19-SL.32)";
 const INITIAL_SECTIONS = ["agreement", "termination", "rules", "schedule", "medication", "curfew", "accountability", "property", "rights"];
 const SIGNATURE_SECTIONS = ["application", "agreement", "fee", "faith", "testing", "release", "receipt"];
-const REQUIRED_ACKS = ["sobriety", "houseRules", "communitySafety", "respect", "feeTerms", "testing", "medication", "curfew", "visitors", "accountability", "property", "rights", "documents", "hygiene", "curseJar", "electronicSignature"];
+const REQUIRED_ACKS = ["sobriety", "houseRules", "communitySafety", "respect", "feeTerms", "testing", "medication", "curfew", "visitors", "accountability", "property", "rights", "documents", "hygiene", "curseJar", "backgroundCheck", "electronicSignature"];
 
 const empty = {
   name: "", preferredName: "", birthDate: "", adult: "", phone: "", email: "", currentAddress: "", referralSource: "",
@@ -98,6 +98,7 @@ export default function IntakeForm({ onDone }: { onDone: () => void }) {
         <Field label="Primary substances previously used">{area("priorSubstances")}</Field><Field label="Current treatment or recovery supports">{area("treatmentSupports")}</Field>
         <Field label="Officer, court, or case contact, if applicable">{input("legalContact")}</Field>
         <Field label="Are you currently required to register as a sex offender?">{select("registryRequirement", ["Yes", "No", "Prefer to discuss with staff"])}</Field>
+        {check("backgroundCheck", "I understand that a background check will be completed on all participants to verify past information.")}
         <div className="packet-two"><Field label="One-year goals">{area("goalOneYear")}</Field><Field label="Five-year goals">{area("goalFiveYears")}</Field></div><Field label="Ten-year goals">{area("goalTenYears")}</Field>
         {check("sobriety", "I agree to live free of alcohol and prohibited drugs.")}
         {check("houseRules", "I agree to follow the house rules, curfew, chores, testing, and required meetings.")}
