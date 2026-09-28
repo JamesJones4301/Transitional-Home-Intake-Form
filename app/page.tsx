@@ -2,6 +2,8 @@
 
 // @ts-nocheck
 import React, { useState, useEffect, useCallback } from "react";
+import ClientIntakeForm from "./IntakeForm";
+import StaffForms from "./StaffForms";
 import {
   Home, LogIn, LogOut, Calendar, Check, X, FileText, Bell,
   ClipboardList, Users, Settings, Send, AlertCircle, ChevronLeft,
@@ -18,7 +20,7 @@ const GOOGLE_SHEET_ID = "13yiU4efcTMpriA10i4_xS50gIlAN4tbAi6BaF9StKH0";
 const GOOGLE_OWNER_EMAIL = "ashreiimpactfoundation@gmail.com";
 const GOOGLE_SIGN_IN_SCOPE = "openid email";
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const DEFAULT_CURFEWS = { 0: "23:00", 1: "21:00", 2: "21:00", 3: "21:00", 4: "21:00", 5: "23:00", 6: "23:00" };
+const DEFAULT_CURFEWS = { 0: "22:00", 1: "22:00", 2: "22:00", 3: "22:00", 4: "22:00", 5: "23:00", 6: "23:00" };
 
 const theme = {
   bg: "#F7F5EF",
@@ -44,7 +46,7 @@ function defaultData() {
   const now = Date.now();
   return {
     tenants: [], checkins: [], requests: [],
-    maintenance: [], dailyReports: [], incidentReports: [],
+    maintenance: [], dailyReports: [], incidentReports: [], staffForms: [],
     settings: { curfews: { ...DEFAULT_CURFEWS }, managerName: "Program coordinator", managerPhone: "" },
     auditLog: [],
     notifications: [],
@@ -150,14 +152,9 @@ export default function App() {
   useEffect(() => {
     (async () => {
       try {
-        const result = window.localStorage.getItem(STORAGE_KEY);
-        if (result) {
-          setData(JSON.parse(result));
-        } else {
-          const fresh = defaultData();
-          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
-          setData(fresh);
-        }
+        // New application and staff records are loaded only after owner verification.
+        // Keep any preexisting local records untouched for the owner to reconcile separately.
+        setData(defaultData());
       } catch (e) {
         setError("Could not load saved data. You can still use the app, but changes may not persist.");
         setData(defaultData());
@@ -176,7 +173,6 @@ export default function App() {
   const persist = useCallback(async (next) => {
     setData(next);
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       if (googleAccessToken) {
         setSyncStatus("Saving securely…");
         await saveGoogleData(next, googleAccessToken);
@@ -204,9 +200,11 @@ export default function App() {
       const saved = await loadGoogleData(token);
       if (saved) {
         setData(saved);
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
       } else {
-        await saveGoogleData(data, token);
+        const legacy = window.localStorage.getItem(STORAGE_KEY);
+        const initial = legacy ? JSON.parse(legacy) : data;
+        await saveGoogleData(initial, token);
+        setData(initial);
       }
       setGoogleAccessToken(token);
       setGoogleUser(profile.email);
@@ -254,13 +252,7 @@ export default function App() {
         )}
         {!role && <Landing setRole={setRole} setResidentId={setResidentId} data={data} />}
         {role === "intake" && (
-          <Intake
-            data={data}
-            persist={persist}
-            addAudit={addAudit}
-            addNotification={addNotification}
-            onDone={() => setRole(null)}
-          />
+          <ClientIntakeForm onDone={() => setRole(null)} />
         )}
         {role === "resident" && (
           <ResidentView
@@ -324,13 +316,14 @@ function OwnerMenu({ setRole }) {
 
 function Header({ role, setRole, setResidentId }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, paddingTop: 4 }}>
+    <div className="portal-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, paddingTop: 4, gap: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: role ? "pointer" : "default" }}
            onClick={() => { if (role) { setRole(null); setResidentId(null); } }}>
         <img src="/ashrei-impact-logo.svg" alt="Ashrei Impact Foundation" style={{ width: 52, height: 52, objectFit: "contain", borderRadius: 8 }} />
         <div>
           <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 19 }}>Ashrei Impact Foundation</div>
           <div style={{ fontSize: 10, color: theme.inkSoft, letterSpacing: "0.08em", textTransform: "uppercase" }}>Member care portal</div>
+          <div className="portal-contact" onClick={event => event.stopPropagation()}><a href="mailto:ashreiimpactfoundation@gmail.com">ashreiimpactfoundation@gmail.com</a><a href="tel:+17373444075">737-344-4075</a></div>
         </div>
       </div>
       {role && (
@@ -364,6 +357,7 @@ function Landing({ setRole, setResidentId, data }) {
           <RoleCard icon={<LogIn size={20} />} title="I am a member at Ashrei currently" desc="Submit an overnight request for program-team approval" onClick={() => setRole("resident")} />
         </div>
       </div>
+      <button onClick={() => setRole("houseManager")} style={{ border: 0, background: "none", color: theme.primary, cursor: "pointer", marginTop: 18, padding: 0, fontSize: 13 }}>Authorized staff forms and reports</button>
     </div>
   );
 }
@@ -384,161 +378,6 @@ function RoleCard({ icon, title, desc, onClick, accent }) {
 }
 
 /* ---------------- INTAKE / LEASE SIGNING ---------------- */
-
-function Intake({ data, persist, addAudit, addNotification, onDone }) {
-  const [form, setForm] = useState({ name: "", phone: "", email: "", room: "", bed: "", admissionDate: new Date().toISOString().slice(0, 10) });
-  const [agreeLease, setAgreeLease] = useState(false);
-  const [agreeRules, setAgreeRules] = useState(false);
-  const [agreeOccupancyTerms, setAgreeOccupancyTerms] = useState(false);
-  const [agreeProgramStandards, setAgreeProgramStandards] = useState(false);
-  const [agreeMoveInHygiene, setAgreeMoveInHygiene] = useState(false);
-  const [agreeCurseJar, setAgreeCurseJar] = useState(false);
-  const [screening, setScreening] = useState({ independentLiving: "", legalOrSupervision: "", treatmentSupport: "", registryRequirement: "", concerns: "" });
-  const [screeningAccurate, setScreeningAccurate] = useState(false);
-  const [consentTest, setConsentTest] = useState(false);
-  const [signature, setSignature] = useState("");
-  const [done, setDone] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-
-  const canSubmit = form.name && form.phone && form.room && form.bed && agreeLease && agreeRules && agreeOccupancyTerms && agreeProgramStandards && agreeMoveInHygiene && agreeCurseJar && screening.independentLiving && screening.legalOrSupervision && screening.treatmentSupport && screening.registryRequirement && screeningAccurate &&
-    signature.trim().toLowerCase() === form.name.trim().toLowerCase() && signature.trim().length > 1;
-
-  const submit = async () => {
-    setSubmitting(true);
-    try {
-      const response = await fetch("/api/public-submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "intake", ...form, consentDrugTest: consentTest, agreementAccepted: true, programStandardsAccepted: agreeProgramStandards, moveInHygieneAccepted: agreeMoveInHygiene, curseJarAccepted: agreeCurseJar, screening, screeningAccurate }) });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Your application could not be submitted.");
-      setDone(true);
-    } catch (error) {
-      window.alert(error.message || "Your application could not be submitted. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  if (done) {
-    return (
-      <Panel>
-        <div style={{ textAlign: "center", padding: "1rem 0" }}>
-          <ShieldCheck size={30} color={theme.accent} style={{ marginBottom: 10 }} />
-          <div style={{ fontWeight: 600, fontSize: 17, marginBottom: 6 }}>Application submitted for review</div>
-          <p style={{ color: theme.inkSoft, fontSize: 14, marginBottom: 18 }}>
-            Your requested Room {form.room}, Bed {form.bed} assignment will be confirmed by the program team. We will email {form.email || "you"} once a decision is made.
-          </p>
-          <div style={{ display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap" }}><button onClick={() => window.print()} style={btnSecondary}>Print / save intake copy</button><button onClick={onDone} style={btnPrimary}>Back to home</button></div>
-          <PayPalFeeButton />
-        </div>
-      </Panel>
-    );
-  }
-
-  return (
-    <Panel title="Ashrei New Member Intake" subtitle="Complete the occupancy agreement and record the member's room and bed assignment.">
-      <figure style={{ margin: "0 0 20px" }}>
-        <img src="/bird-pepper-place-exterior.jpg" alt="Exterior of Bird Pepper Place" width={1080} height={810} loading="eager" style={{ display: "block", width: "100%", height: 180, objectFit: "cover", objectPosition: "center 55%", borderRadius: 10 }} />
-        <figcaption style={{ fontSize: 12, color: theme.inkSoft, marginTop: 7 }}>Bird Pepper Place</figcaption>
-      </figure>
-      <Field label="Full name">
-        <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={input} placeholder="Jordan Reyes" />
-      </Field>
-      <div className="two-col-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <Field label="Phone (for texts)">
-          <input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} style={input} placeholder="(555) 555-1212" />
-        </Field>
-        <Field label="Email (for agreement copy)">
-          <input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} style={input} placeholder="jordan@email.com" />
-        </Field>
-      </div>
-      <Field label="Move-in date">
-        <input type="date" value={form.admissionDate} onChange={e => setForm({ ...form, admissionDate: e.target.value })} style={input} />
-      </Field>
-
-      <div className="two-col-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <Field label="Assigned room">
-          <input value={form.room} onChange={e => setForm({ ...form, room: e.target.value })} style={input} placeholder="e.g., 201" />
-        </Field>
-        <Field label="Assigned bed">
-          <input value={form.bed} onChange={e => setForm({ ...form, bed: e.target.value })} style={input} placeholder="e.g., A or 1" />
-        </Field>
-      </div>
-
-      <div style={{ background: theme.primarySoft, borderRadius: 10, padding: "0.9rem 1rem", margin: "1rem 0", fontSize: 13, color: theme.ink, lineHeight: 1.6 }}>
-        <strong>Residency agreement (summary):</strong> Participation follows the terms in your full residency agreement. Community hours apply as posted,
-        and overnight stays require prior approval. Program commitments and discharge procedures are detailed in the full agreement.
-      </div>
-      <CheckField label="I have read and agree to the residency terms" checked={agreeLease} onChange={setAgreeLease} />
-      <CheckField label="I have read and agree to the community commitments" checked={agreeRules} onChange={setAgreeRules} />
-
-      <div style={{ background: theme.bg, border: `1px solid ${theme.border}`, borderRadius: 10, padding: "0.95rem 1rem", margin: "1rem 0", fontSize: 13, lineHeight: 1.55 }}>
-        <strong style={{ display: "block", marginBottom: 8 }}>Screening and support information</strong>
-        <p style={{ margin: "0 0 12px", color: theme.inkSoft }}>These answers help the program team review whether this shared-living setting is appropriate. They do not replace a full review or emergency assessment.</p>
-        <Field label="Can you live independently without 24-hour medical or clinical supervision?">
-          <select value={screening.independentLiving} onChange={e => setScreening({ ...screening, independentLiving: e.target.value })} style={input}><option value="">Select an answer</option><option>Yes</option><option>No</option></select>
-        </Field>
-        <Field label="Are you currently on probation, parole, or another form of legal supervision?">
-          <select value={screening.legalOrSupervision} onChange={e => setScreening({ ...screening, legalOrSupervision: e.target.value })} style={input}><option value="">Select an answer</option><option>Yes</option><option>No</option></select>
-        </Field>
-        <Field label="Are you currently receiving treatment, counseling, or recovery support services?">
-          <select value={screening.treatmentSupport} onChange={e => setScreening({ ...screening, treatmentSupport: e.target.value })} style={input}><option value="">Select an answer</option><option>Yes</option><option>No</option></select>
-        </Field>
-        <Field label="Are you currently required to register as a sex offender?">
-          <select value={screening.registryRequirement} onChange={e => setScreening({ ...screening, registryRequirement: e.target.value })} style={input}><option value="">Select an answer</option><option>Yes</option><option>No</option></select>
-        </Field>
-        <Field label="Safety, legal, medical, behavioral, medication, or housing concerns the program team should review (optional)">
-          <textarea value={screening.concerns} onChange={e => setScreening({ ...screening, concerns: e.target.value })} style={{ ...input, minHeight: 76, resize: "vertical" }} placeholder="Share only information relevant to your housing review." />
-        </Field>
-      </div>
-      <CheckField label="I certify that my screening answers are complete and accurate, and I will promptly update the program team if they change" checked={screeningAccurate} onChange={setScreeningAccurate} />
-
-      <div style={{ background: theme.amberSoft, border: `1px solid ${theme.amber}33`, borderRadius: 10, padding: "0.95rem 1rem", margin: "1rem 0", fontSize: 13, color: theme.ink, lineHeight: 1.6 }}>
-        <strong style={{ display: "block", marginBottom: 6 }}>Important occupancy and payment terms</strong>
-        <ul style={{ margin: 0, paddingLeft: 20 }}>
-          <li>This occupancy agreement may be terminated if a member's conduct creates an environment that other members reasonably experience as unwelcoming.</li>
-          <li>Conduct that disrupts another member's stay or the shared living environment may result in corrective action or termination of occupancy, subject to applicable law and program policy.</li>
-          <li>All payments are non-refundable.</li>
-          <li>A $100 administrative/application fee is required and is non-refundable.</li>
-          <li>Funds must be paid by cash, business check made payable to Ashrei Impact Foundation, or PayPal using the button below.</li>
-          <li>Members who plan to move out must provide at least 30 days' written notice. When an eviction process applies, the notice period may range from 3 to 30 days as required by applicable law and the formal notice.</li>
-        </ul>
-      </div>
-      <CheckField label="I have read, understand, and agree to the occupancy and payment terms above" checked={agreeOccupancyTerms} onChange={setAgreeOccupancyTerms} />
-      <div style={{ background: theme.primarySoft, borderRadius: 10, padding: "0.95rem 1rem", margin: "1rem 0", fontSize: 13, lineHeight: 1.6 }}>
-        <strong style={{ display: "block", marginBottom: 6 }}>Program standards acknowledgment</strong>
-        I understand this is a clean and sober, faith-centered shared living environment. Alcohol and illegal drugs are not allowed onsite. Cigarettes may not be smoked anywhere around the house; smoking is permitted only down at the street. I agree to comply with sober-living safety rules, mandatory and random drug/alcohol testing, curfew and pre-approved overnight requirements, visitor limits, member privacy, maintenance reporting, and the grievance process. I understand serious or repeated unsafe conduct may result in corrective action or program discharge, subject to applicable law and program policy.
-      </div>
-      <CheckField label="I have reviewed and agree to the House Rules, safety standards, testing, curfew/overnight, visitor, maintenance, grievance, privacy, and program-discharge policies" checked={agreeProgramStandards} onChange={setAgreeProgramStandards} />
-      <CheckField label="By checking this box, I acknowledge there will be a curse jar and I am willing to participate by placing $1 in the jar if I curse or act unruly toward another house guest" checked={agreeCurseJar} onChange={setAgreeCurseJar} />
-      <div style={{ background: theme.accentSoft, borderRadius: 10, padding: "0.95rem 1rem", margin: "1rem 0", fontSize: 13, lineHeight: 1.6 }}>
-        <strong style={{ display: "block", marginBottom: 6 }}>Required before entering your assigned room</strong>
-        All washable clothing and fabric items must be placed directly into laundry and washed/dried as directed with the program-provided bedbug laundry detergent/additive before entering the bedroom or storage area. You must also shower before settling into your assigned room and report any suspected pest concern immediately.
-      </div>
-      <CheckField label="I understand and will complete the required laundry and shower procedure before entering my room" checked={agreeMoveInHygiene} onChange={setAgreeMoveInHygiene} />
-      <CheckField label="I consent to being drug tested, including upon return from any approved overnight stay" checked={consentTest} onChange={setConsentTest} />
-
-      <Field label="Type your full name as your signature">
-        <input value={signature} onChange={e => setSignature(e.target.value)} style={input} placeholder="Type your name to sign" />
-      </Field>
-      <p style={{ fontSize: 12, color: theme.inkSoft, marginTop: -6, marginBottom: 14 }}>
-        Typing your name records your acknowledgement with a timestamp in this prototype.
-      </p>
-
-      <button disabled={!canSubmit || submitting} onClick={submit} style={canSubmit && !submitting ? btnPrimary : btnDisabled}>
-        {submitting ? "Submitting securely…" : "Sign and submit"}
-      </button>
-      <PayPalFeeButton />
-    </Panel>
-  );
-}
-
-function PayPalFeeButton() {
-  return (
-    <div style={{ marginTop: 16 }}>
-      <a href="https://www.paypal.com/ncp/payment/8P5J6RWQF8TKC" target="_blank" rel="noopener noreferrer" style={{ ...btnSecondary, display: "inline-block", textDecoration: "none" }}>Pay $100 administrative/application fee with PayPal</a>
-      <p style={{ color: theme.inkSoft, fontSize: 12, margin: "8px 0 0" }}>PayPal opens in a new tab. Enter $100 and include your full name with the payment.</p>
-    </div>
-  );
-}
 
 /* ---------------- RESIDENT VIEW ---------------- */
 
@@ -698,7 +537,7 @@ function ManagerView({ data, persist, addAudit, addNotification, readOnly, googl
   const [tab, setTab] = useState(readOnly ? "reports" : "today");
   const tabs = readOnly
     ? [["reports", "Reports"]]
-    : [["today", "Today"], ["intakes", "Intake approvals"], ["assignments", "Rooms & beds"], ["requests", "Overnight requests"], ["maintenance", "Maintenance"], ["houseReports", "House reports"], ["reports", "Reports"], ["comms", "Notifications"], ["settings", "Settings"]];
+    : [["today", "Today"], ["intakes", "Intake approvals"], ["assignments", "Rooms & beds"], ["requests", "Overnight requests"], ["maintenance", "Maintenance"], ["houseReports", "House reports"], ["staffRecords", "Staff records"], ["reports", "Reports"], ["comms", "Notifications"], ["settings", "Settings"]];
 
   return (
     <div>
@@ -717,6 +556,7 @@ function ManagerView({ data, persist, addAudit, addNotification, readOnly, googl
       {tab === "requests" && <RequestsTab data={data} persist={persist} addAudit={addAudit} addNotification={addNotification} />}
       {tab === "maintenance" && <MaintenanceTab data={data} />}
       {tab === "houseReports" && <HouseReportsTab data={data} />}
+      {tab === "staffRecords" && <StaffRecordsTab data={data} />}
       {tab === "reports" && <ReportsTab data={data} />}
       {tab === "comms" && <CommsTab data={data} persist={persist} addAudit={addAudit} addNotification={addNotification} />}
       {tab === "settings" && <SettingsTab data={data} persist={persist} addAudit={addAudit} />}
@@ -777,6 +617,16 @@ function HouseReportsTab({ data }) {
   return <div><Panel title="Daily reports" subtitle="Submitted by the House Manager for Owner review."><ReportRows reports={daily} empty="No daily reports submitted." /></Panel><Panel title="Incident reports" subtitle="Document facts, actions taken, and items requiring Owner follow-up."><ReportRows reports={incidents} empty="No incident reports submitted." /></Panel></div>;
 }
 
+function StaffRecordsTab({ data }) {
+  const records = [...(data.staffForms || [])].sort((a, b) => b.createdAt - a.createdAt);
+  return <Panel title="Staff accountability and safety records" subtitle="Restricted to the authorized program-team workspace. Review the complete facts before taking a program decision. A saved record does not itself serve a legal notice.">
+    {records.length === 0 ? <EmptyState text="No staff forms have been submitted." /> : <div style={{ display: "grid", gap: 12 }}>{records.map(record => <details key={record.id} style={{ background: theme.bg, padding: 12, borderRadius: 8 }}>
+      <summary style={{ cursor: "pointer", fontWeight: 600 }}>{record.formLabel} · {record.fields?.participant || "No participant"} · {fmtTime(record.createdAt)}</summary>
+      <dl className="staff-record-details">{Object.entries(record.fields || {}).map(([key, value]) => <React.Fragment key={key}><dt>{key.replace(/([A-Z])/g, " $1")}</dt><dd>{Array.isArray(value) ? value.join(", ") : String(value || "—")}</dd></React.Fragment>)}</dl>
+    </details>)}</div>}
+  </Panel>;
+}
+
 function HouseManagerPortal() {
   const [tab, setTab] = useState("daily");
   const [code, setCode] = useState("");
@@ -793,7 +643,7 @@ function HouseManagerPortal() {
     } catch (error) { setStatus(error.message || "Report could not be submitted."); }
   };
   const ready = code && form.managerName && form.summary;
-  return <div><div style={{ display: "flex", gap: 8, marginBottom: 16 }}><button onClick={() => setTab("daily")} style={tab === "daily" ? tabActive : tabInactive}>Daily report</button><button onClick={() => setTab("incident")} style={tab === "incident" ? tabActive : tabInactive}>Incident report</button></div><Panel title={tab === "daily" ? "House Manager daily report" : "House Manager incident report"} subtitle="This private submission goes directly to the Owner workspace. Do not include information that is not necessary for program follow-up."><Field label="House Manager access code"><input type="password" value={code} onChange={e => setCode(e.target.value)} style={input} /></Field><Field label="Your name"><input value={form.managerName} onChange={e => setForm({ ...form, managerName: e.target.value })} style={input} /></Field><Field label="Members involved (if applicable)"><input value={form.residents} onChange={e => setForm({ ...form, residents: e.target.value })} style={input} /></Field><Field label={tab === "daily" ? "Daily report" : "What happened?"}><textarea value={form.summary} onChange={e => setForm({ ...form, summary: e.target.value })} style={{ ...input, minHeight: 110, resize: "vertical" }} /></Field><Field label="Action taken / Owner follow-up needed (optional)"><textarea value={form.actionTaken} onChange={e => setForm({ ...form, actionTaken: e.target.value })} style={{ ...input, minHeight: 76, resize: "vertical" }} /></Field><button onClick={submit} disabled={!ready} style={ready ? btnPrimary : btnDisabled}>Send report to Owner</button>{status && <p style={{ color: theme.inkSoft, fontSize: 13 }}>{status}</p>}</Panel></div>;
+  return <div><div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}><button onClick={() => setTab("daily")} style={tab === "daily" ? tabActive : tabInactive}>Daily report</button><button onClick={() => setTab("incident")} style={tab === "incident" ? tabActive : tabInactive}>Incident report</button><button onClick={() => setTab("staff")} style={tab === "staff" ? tabActive : tabInactive}>Staff forms</button></div>{tab === "staff" ? <StaffForms /> : <Panel title={tab === "daily" ? "House Manager daily report" : "House Manager incident report"} subtitle="This private submission goes directly to the Owner workspace. Do not include information that is not necessary for program follow-up."><Field label="House Manager access code"><input type="password" value={code} onChange={e => setCode(e.target.value)} style={input} /></Field><Field label="Your name"><input value={form.managerName} onChange={e => setForm({ ...form, managerName: e.target.value })} style={input} /></Field><Field label="Members involved (if applicable)"><input value={form.residents} onChange={e => setForm({ ...form, residents: e.target.value })} style={input} /></Field><Field label={tab === "daily" ? "Daily report" : "What happened?"}><textarea value={form.summary} onChange={e => setForm({ ...form, summary: e.target.value })} style={{ ...input, minHeight: 110, resize: "vertical" }} /></Field><Field label="Action taken / Owner follow-up needed (optional)"><textarea value={form.actionTaken} onChange={e => setForm({ ...form, actionTaken: e.target.value })} style={{ ...input, minHeight: 76, resize: "vertical" }} /></Field><button onClick={submit} disabled={!ready} style={ready ? btnPrimary : btnDisabled}>Send report to Owner</button>{status && <p style={{ color: theme.inkSoft, fontSize: 13 }}>{status}</p>}</Panel>}</div>;
 }
 
 function ResidentOvernightRequest() {
@@ -934,11 +784,25 @@ function AssignmentsTab({ data, persist, addAudit }) {
 function IntakeApprovalsTab({ data, persist, addAudit, addNotification }) {
   const pending = data.tenants.filter(t => t.approvalStatus === "pending").sort((a, b) => (a.submittedAt || 0) - (b.submittedAt || 0));
   const reviewed = data.tenants.filter(t => t.approvalStatus === "approved" || t.approvalStatus === "denied").sort((a, b) => (b.reviewedAt || 0) - (a.reviewedAt || 0)).slice(0, 15);
+  const [finalTerms, setFinalTerms] = useState({});
+  const setTerm = (id, key, value) => setFinalTerms(previous => ({ ...previous, [id]: { ...(previous[id] || {}), [key]: value } }));
 
   const decide = async (applicant, status) => {
     const next = JSON.parse(JSON.stringify(data));
     const record = next.tenants.find(t => t.id === applicant.id);
     if (status === "approved") {
+      const terms = finalTerms[record.id] || {};
+      if (record.application) {
+        if (!terms.room?.trim() || !terms.bed?.trim() || !terms.programStartDate || !Number.isFinite(Number(terms.monthlyRate)) || Number(terms.monthlyRate) < 900 || terms.participantSignature?.trim().toLowerCase() !== record.name.trim().toLowerCase() || !terms.staffSignature?.trim()) {
+          window.alert("With the participant present, enter the confirmed room, bed, start date, monthly fee, participant signature, and Ashrei representative name before approval.");
+          return;
+        }
+        record.room = terms.room.trim(); record.bed = terms.bed.trim();
+        record.admissionDate = new Date(`${terms.programStartDate}T12:00:00`).getTime();
+        record.monthlyRate = Number(terms.monthlyRate);
+        record.application.finalTerms = { room: record.room, bed: record.bed, programStartDate: terms.programStartDate, monthlyRate: record.monthlyRate, participantSignature: terms.participantSignature.trim(), ashreiRepresentative: terms.staffSignature.trim(), signedAt: Date.now() };
+        record.feeAssignmentPending = false; record.leaseSigned = true;
+      }
       const conflict = next.tenants.find(t => t.id !== record.id && t.active && (t.room || "").toLowerCase() === (record.room || "").toLowerCase() && (t.bed || "").toLowerCase() === (record.bed || "").toLowerCase());
       if (conflict) {
         window.alert(`Room ${record.room}, Bed ${record.bed} is already assigned to ${conflict.name}. Update the room and bed before approving this application.`);
@@ -948,11 +812,11 @@ function IntakeApprovalsTab({ data, persist, addAudit, addNotification }) {
     }
     record.approvalStatus = status;
     record.reviewedAt = Date.now();
-    record.reviewedBy = next.settings.managerName;
+    record.reviewedBy = finalTerms[record.id]?.staffSignature?.trim() || next.settings.managerName;
     addAudit(next, next.settings.managerName, `intake_${status}`, `${status} intake application for ${record.name}.`);
     if (record.email) {
       addNotification(next, record.email, "email", status === "approved"
-        ? `Your residency application has been approved. Your confirmed assignment is Room ${record.room}, Bed ${record.bed}. (Simulated email.)`
+        ? `Your program application has been approved. Your confirmed assignment is Room ${record.room}, Bed ${record.bed}. (Simulated email.)`
         : "Your residency application was not approved at this time. Please contact the program coordinator with any questions. (Simulated email.)");
     }
     await persist(next);
@@ -960,7 +824,7 @@ function IntakeApprovalsTab({ data, persist, addAudit, addNotification }) {
 
   return (
     <div>
-      <Panel title="Pending intake applications" subtitle="Approve an application to activate the member and confirm their room and bed assignment.">
+      <Panel title="Pending intake applications" subtitle="Review the full packet. Confirm the rate and sleeping space with the participant present before approval.">
         {pending.length === 0 ? <EmptyState text="No intake applications are waiting for review." /> : (
           <div style={{ display: "grid", gap: 10 }}>
             {pending.map(applicant => (
@@ -969,13 +833,32 @@ function IntakeApprovalsTab({ data, persist, addAudit, addNotification }) {
                   <div>
                     <div style={{ fontWeight: 600 }}>{applicant.name}</div>
                     <div style={{ fontSize: 13, color: theme.inkSoft }}>{applicant.phone} · {applicant.email || "No email"}</div>
-                    <div style={{ fontSize: 13, color: theme.inkSoft, marginTop: 3 }}>Requested assignment: Room {applicant.room}, Bed {applicant.bed}</div>
+                    <div style={{ fontSize: 13, color: theme.inkSoft, marginTop: 3 }}>Submitted {fmtTime(applicant.submittedAt)} · Assignment {applicant.room && applicant.bed ? `Room ${applicant.room}, Bed ${applicant.bed}` : "pending"}</div>
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
                     <button aria-label={`Approve ${applicant.name}`} onClick={() => decide(applicant, "approved")} style={btnSmallPrimary}><Check size={14} /></button>
                     <button aria-label={`Deny ${applicant.name}`} onClick={() => decide(applicant, "denied")} style={btnSmallDanger}><X size={14} /></button>
                   </div>
                 </div>
+                {applicant.application && <>
+                  <details style={{ width: "100%", fontSize: 13 }}><summary style={{ cursor: "pointer", fontWeight: 600 }}>Review submitted answers, initials, and signatures</summary>
+                    <div style={{ padding: "8px 0" }}>Packet: {applicant.application.packetVersion} · Signed {fmtTime(applicant.application.signedAt)}</div>
+                    <dl className="staff-record-details">{Object.entries(applicant.application.applicant || {}).map(([key, value]) => <React.Fragment key={key}><dt>{key.replace(/([A-Z])/g, " $1")}</dt><dd>{Array.isArray(value) ? value.join(", ") : String(value || "—")}</dd></React.Fragment>)}</dl>
+                    <p><strong>Initials:</strong> {Object.entries(applicant.application.initials || {}).map(([key, value]) => `${key}: ${value}`).join(" · ")}</p>
+                    <p><strong>Typed signatures:</strong> {Object.entries(applicant.application.signatures || {}).map(([key, value]) => `${key}: ${value}`).join(" · ")}</p>
+                  </details>
+                  <div className="two-col-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, width: "100%" }}>
+                    <Field label="Confirmed room"><input value={finalTerms[applicant.id]?.room || applicant.room || ""} onChange={e => setTerm(applicant.id, "room", e.target.value)} style={input} /></Field>
+                    <Field label="Confirmed bed"><input value={finalTerms[applicant.id]?.bed || applicant.bed || ""} onChange={e => setTerm(applicant.id, "bed", e.target.value)} style={input} /></Field>
+                    <Field label="Confirmed monthly fee ($)"><input type="number" min="900" value={finalTerms[applicant.id]?.monthlyRate || applicant.monthlyRate || ""} onChange={e => setTerm(applicant.id, "monthlyRate", e.target.value)} style={input} /></Field>
+                    <Field label="Program start date"><input type="date" value={finalTerms[applicant.id]?.programStartDate || ""} onChange={e => setTerm(applicant.id, "programStartDate", e.target.value)} style={input} /></Field>
+                  </div>
+                  <p style={{ fontSize: 12, color: theme.inkSoft, margin: 0 }}>Read the final fee, room, bed, and start date aloud with the participant. The participant types their own full legal name below. Save or print this record for the participant.</p>
+                  <div className="two-col-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, width: "100%" }}>
+                    <Field label="Participant signature for confirmed terms"><input value={finalTerms[applicant.id]?.participantSignature || ""} onChange={e => setTerm(applicant.id, "participantSignature", e.target.value)} style={input} /></Field>
+                    <Field label="Authorized Ashrei representative"><input value={finalTerms[applicant.id]?.staffSignature || ""} onChange={e => setTerm(applicant.id, "staffSignature", e.target.value)} style={input} /></Field>
+                  </div>
+                </>}
               </div>
             ))}
           </div>
