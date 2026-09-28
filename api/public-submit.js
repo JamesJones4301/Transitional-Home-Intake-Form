@@ -1,4 +1,5 @@
 import { EMPTY_STATE, readState, writeState } from "./_sheets.js";
+import { authorizeStaff } from "./_staff-access.js";
 
 const id = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 const clean = value => String(value || "").trim();
@@ -26,7 +27,7 @@ export default async function handler(req, res) {
       const formType = clean(body.formType), accessCode = clean(body.accessCode);
       if (!Object.hasOwn(STAFF_LABELS, formType)) return res.status(400).json({ error: "Select a valid staff form." });
       const data = (await readState()) || structuredClone(EMPTY_STATE);
-      if (!data.settings?.houseManagerAccessCode || accessCode !== data.settings.houseManagerAccessCode) return res.status(403).json({ error: "The staff access code is not valid. Contact the Owner." });
+      try { await authorizeStaff(req, data, accessCode); } catch (error) { return res.status(error.status || 403).json({ error: error.message }); }
       if (!body.fields || typeof body.fields !== "object" || Array.isArray(body.fields)) return res.status(400).json({ error: "Complete the staff form." });
       const fields = Object.fromEntries(Object.entries(body.fields).filter(([key]) => /^[a-zA-Z][a-zA-Z0-9]{0,39}$/.test(key)).map(([key, value]) => [key, Array.isArray(value) ? value.slice(0, 20).map(item => clean(item).slice(0, 200)) : clean(value).slice(0, 4000)]));
       if (STAFF_REQUIRED[formType].some(key => !fields[key] || (Array.isArray(fields[key]) && !fields[key].length))) return res.status(400).json({ error: "Complete every required staff field." });
@@ -40,9 +41,9 @@ export default async function handler(req, res) {
     }
     if (body.type === "manager-daily" || body.type === "manager-incident") {
       const managerName = clean(body.managerName), summary = clean(body.summary), accessCode = clean(body.accessCode);
-      if (!managerName || !summary || !accessCode) return res.status(400).json({ error: "Please complete the access code, your name, and the report." });
+      if (!managerName || !summary) return res.status(400).json({ error: "Please enter your name and complete the report." });
       const data = (await readState()) || structuredClone(EMPTY_STATE);
-      if (!data.settings?.houseManagerAccessCode || accessCode !== data.settings.houseManagerAccessCode) return res.status(403).json({ error: "That House Manager access code is not valid. Contact the Owner." });
+      try { await authorizeStaff(req, data, accessCode); } catch (error) { return res.status(error.status || 403).json({ error: error.message }); }
       const createdAt = Date.now();
       const report = { id: id(), managerName, residents: clean(body.residents), summary, actionTaken: clean(body.actionTaken), createdAt };
       const isIncident = body.type === "manager-incident";

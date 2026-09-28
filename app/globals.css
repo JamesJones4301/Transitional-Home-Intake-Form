@@ -133,6 +133,23 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgb(196 147 66 / 
 .staff-record-details { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 5px 12px; font-size: 13px; line-height: 1.5; margin-bottom: 0; }
 .staff-record-details dt { font-weight: 600; text-transform: capitalize; }
 .staff-record-details dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.report-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+.report-charts h3 { font-size: 15px; margin: 0 0 5px; }
+.chart-legend { color: #66736e; font-size: 12px; margin: 0 0 14px; }
+.chart-dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-left: 8px; }
+.chart-dot:first-child { margin-left: 0; }
+.chart-checkin { background: #174c3c; }
+.chart-request { background: #c49342; }
+.chart-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+.chart-day { min-width: 0; text-align: center; font-size: 11px; }
+.chart-day strong, .chart-day small { display: block; white-space: nowrap; }
+.chart-day small { color: #66736e; }
+.chart-columns { display: flex; align-items: end; justify-content: center; gap: 3px; height: 118px; border-bottom: 1px solid #ddd9cc; margin-bottom: 5px; }
+.chart-columns span { width: 12px; min-height: 0; border-radius: 3px 3px 0 0; }
+.chart-outcomes { display: grid; gap: 12px; margin-top: 20px; }
+.chart-outcome { display: grid; grid-template-columns: 70px 1fr 24px; gap: 8px; align-items: center; font-size: 12px; }
+.chart-track { height: 14px; border-radius: 6px; background: #f7f5ef; overflow: hidden; }
+.chart-track span { display: block; height: 100%; border-radius: 6px; }
 @media print { .packet-shell { color: black; } .packet-section { break-inside: avoid; border-color: #999; } .packet-submit, .packet-pay, .packet-success button { display: none; } }
 
 .welcome-grid {
@@ -154,6 +171,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgb(196 147 66 / 
   gap: 14px;
 }
 @media (max-width: 640px) {
+  .report-charts { grid-template-columns: 1fr; }
   .portal-header { flex-wrap: wrap; }
   .packet-header, .packet-two, .packet-schedule, .staff-record-details { grid-template-columns: 1fr; }
   .packet-header figure, .packet-heading, .packet-intro { grid-column: 1; grid-row: auto; }
