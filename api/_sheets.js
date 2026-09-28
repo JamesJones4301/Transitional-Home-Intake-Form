@@ -2,10 +2,11 @@ import { google } from "googleapis";
 
 const SPREADSHEET_ID = "13yiU4efcTMpriA10i4_xS50gIlAN4tbAi6BaF9StKH0";
 const OWNER_EMAIL = "ashreiimpactfoundation@gmail.com";
+const PACKET_CURFEWS = { 0: "22:00", 1: "22:00", 2: "22:00", 3: "22:00", 4: "22:00", 5: "23:00", 6: "23:00" };
 const EMPTY_STATE = {
   tenants: [], checkins: [], requests: [],
-  maintenance: [], dailyReports: [], incidentReports: [],
-  settings: { curfews: { 0: "23:00", 1: "21:00", 2: "21:00", 3: "21:00", 4: "21:00", 5: "23:00", 6: "23:00" }, managerName: "Program coordinator", managerPhone: "" },
+  maintenance: [], dailyReports: [], incidentReports: [], staffForms: [],
+  settings: { curfews: PACKET_CURFEWS, curfewPolicyVersion: "client-packet-2026-09-28", managerName: "Program coordinator", managerPhone: "" },
   auditLog: [], notifications: [],
 };
 
@@ -47,7 +48,12 @@ export async function readState() {
   const client = await sheets();
   const result = await client.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: "'Portal State'!A1" });
   const value = result.data.values?.[0]?.[0];
-  return value ? JSON.parse(value) : null;
+  if (!value) return null;
+  const data = JSON.parse(value);
+  if (!data.settings?.curfewPolicyVersion) {
+    data.settings = { ...(data.settings || {}), curfews: { ...PACKET_CURFEWS }, curfewPolicyVersion: "client-packet-2026-09-28" };
+  }
+  return data;
 }
 
 export async function writeState(data) {
