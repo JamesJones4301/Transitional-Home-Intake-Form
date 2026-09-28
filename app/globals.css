@@ -88,18 +88,23 @@ button, input { font: inherit; }
 button { transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease; }
 button:not(:disabled):hover { transform: translateY(-1px); box-shadow: 0 7px 20px rgb(23 76 60 / 10%); }
 button:focus-visible, input:focus-visible { outline: 3px solid rgb(196 147 66 / 35%); outline-offset: 2px; }
-.portal-contact { display: flex; flex-wrap: wrap; gap: 3px 12px; margin-top: 5px; font-size: 12px; }
+.portal-contact { display: flex; flex-wrap: wrap; gap: 3px 16px; margin-top: 5px; font-size: 12px; }
+.portal-contact strong { color: #66736e; font-weight: 600; }
 .portal-contact a { color: #174c3c; text-decoration: none; }
 .portal-contact a:hover { text-decoration: underline; }
 
 .packet-shell { color: #22332d; }
-.packet-header { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 20px; align-items: center; margin-bottom: 20px; }
+.packet-header { display: grid; grid-template-columns: 220px minmax(0, 1fr); column-gap: 20px; row-gap: 12px; align-items: start; margin-bottom: 20px; }
 .packet-header figure { margin: 0; }
 .packet-header img { width: 100%; height: 200px; object-fit: cover; border-radius: 12px; }
 .packet-header figcaption { color: #5c6963; font-size: 12px; line-height: 1.4; margin-top: 6px; }
+.packet-heading { padding-top: 2px; }
+.packet-intro { grid-column: 1 / -1; }
 .packet-header h1 { font-family: Fraunces, Georgia, serif; font-size: 26px; line-height: 1.2; margin: 0 0 8px; }
 .packet-header p { margin: 6px 0; font-size: 14px; line-height: 1.55; }
+.packet-intro p:first-child { margin-top: 0; }
 .packet-header a, .packet-pay { color: #174c3c; font-weight: 600; }
+.packet-document { display: inline-block; margin: 3px 0 8px; text-decoration: underline; text-underline-offset: 3px; }
 .packet-section { background: white; border: 1px solid #ddd9cc; border-radius: 12px; padding: 22px; margin: 0 0 16px; }
 .packet-completed-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
 .packet-section h2 { font-family: Fraunces, Georgia, serif; font-size: 20px; margin: 0 0 12px; }

@@ -71,8 +71,10 @@ export default function IntakeForm({ onDone }: { onDone: () => void }) {
   return <div className="packet-shell">
     <header className="packet-header">
       <figure><img src="/bird-pepper-place-exterior.jpg" alt="Bird Pepper Place residence" /><figcaption>Bird Pepper Place, 2017 Cheshire Drive, Austin</figcaption></figure>
-      <div><h1>Ashrei New Participant Intake</h1><p>Bird Pepper Place sober-living program, 2017 Cheshire Dr, Austin, TX 78723</p>
-        <p>Review each section below before signing. Ask Ashrei staff for a copy of the full program packet for your records.</p>
+      <div className="packet-heading"><h1>Ashrei New Participant Intake</h1><p>Bird Pepper Place sober-living program, 2017 Cheshire Dr, Austin, TX 78723</p></div>
+      <div className="packet-intro">
+        <p>Review each section below before signing. You can open or download the full program packet for your records.</p>
+        <a className="packet-document" href="https://drive.google.com/file/d/1CgmfKmgkGatMcodZ27dh4nlM1D392ys4/view" target="_blank" rel="noopener noreferrer">Ashrei Impact Foundation Sober Living Program Client View</a>
         <p className="packet-note">Submission does not guarantee admission or a bed assignment. Ashrei does not provide detoxification, medical care, medication administration, or clinical substance-use treatment.</p>
       </div>
     </header>
@@ -187,8 +189,8 @@ export default function IntakeForm({ onDone }: { onDone: () => void }) {
         {check("rights", "I reviewed my rights and the grievance or appeal process.")}{initial("rights", "Rights and grievance policy")}
       </Section>
 
-      <Section title="14. Additional house commitments retained from the prior intake">
-        <p>Before entering an assigned room, wash and dry washable clothing and fabrics as directed with the program-provided pest-control laundry product, shower, and report suspected pests. The prior intake also described a $1 curse jar for cursing or unruly behavior toward another guest.</p>
+      <Section title="14. Move-in and house commitments">
+        <p>Before entering an assigned room, wash and dry washable clothing and fabrics as directed with the program-provided pest-control laundry product, shower, and report suspected pests. A $1 curse jar applies to cursing or unruly behavior toward another participant.</p>
         {check("hygiene", "I understand the move-in laundry and shower procedure.")}
         {check("curseJar", "I acknowledge the $1 curse jar commitment described above.")}
       </Section>
