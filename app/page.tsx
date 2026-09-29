@@ -85,6 +85,18 @@ function requestGoogleToken() {
   });
 }
 
+function requestGmailSendToken() {
+  return new Promise((resolve, reject) => {
+    const client = window.google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: "openid email https://www.googleapis.com/auth/gmail.send",
+      callback: response => response.error ? reject(new Error(response.error)) : resolve(response.access_token),
+      error_callback: () => reject(new Error("Google email permission was cancelled or blocked.")),
+    });
+    client.requestAccessToken({ prompt: "select_account" });
+  });
+}
+
 function iso(value) {
   if (!value) return "";
   const date = new Date(value);
@@ -173,14 +185,15 @@ export default function App() {
   const persist = useCallback(async (next) => {
     setData(next);
     try {
-      if (googleAccessToken) {
-        setSyncStatus("Saving securely…");
-        await saveGoogleData(next, googleAccessToken);
-        setSyncStatus("Saved to Google Sheets");
-      }
+      if (!googleAccessToken) return false;
+      setSyncStatus("Saving securely…");
+      await saveGoogleData(next, googleAccessToken);
+      setSyncStatus("Saved to Google Sheets");
+      return true;
     } catch {
       setSyncStatus("Secure connection needs attention");
       setError("Changes could not be saved to the private system. Reconnect as Owner and try again.");
+      return false;
     }
   }, [googleAccessToken]);
 
@@ -810,7 +823,53 @@ function IntakeApprovalsTab({ data, persist, addAudit, addNotification }) {
   const pending = data.tenants.filter(t => t.approvalStatus === "pending").sort((a, b) => (a.submittedAt || 0) - (b.submittedAt || 0));
   const reviewed = data.tenants.filter(t => t.approvalStatus === "approved" || t.approvalStatus === "denied").sort((a, b) => (b.reviewedAt || 0) - (a.reviewedAt || 0)).slice(0, 15);
   const [finalTerms, setFinalTerms] = useState({});
+  const [gmailAccessToken, setGmailAccessToken] = useState("");
+  const [emailBusyId, setEmailBusyId] = useState(null);
   const setTerm = (id, key, value) => setFinalTerms(previous => ({ ...previous, [id]: { ...(previous[id] || {}), [key]: value } }));
+
+  const sendCopy = async (recordId, savedData = data) => {
+    if (emailBusyId) return;
+    const next = JSON.parse(JSON.stringify(savedData));
+    const record = next.tenants.find(t => t.id === recordId);
+    if (!record || record.approvalStatus !== "approved" || !record.application) return;
+    setEmailBusyId(recordId);
+    try {
+      let token = gmailAccessToken;
+      if (!token) {
+        token = await requestGmailSendToken();
+        const profileResponse = await fetch("https://openidconnect.googleapis.com/v1/userinfo", { headers: { Authorization: `Bearer ${token}` } });
+        const profile = profileResponse.ok ? await profileResponse.json() : {};
+        if ((profile.email || "").toLowerCase() !== GOOGLE_OWNER_EMAIL) {
+          window.google.accounts.oauth2.revoke(token);
+          throw new Error(`Connect Gmail as ${GOOGLE_OWNER_EMAIL} to send approved intake copies.`);
+        }
+        setGmailAccessToken(token);
+      }
+      const response = await fetch("/api/approved-intake-copy", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ recordId, force: Boolean(record.approvalCopyEmailSentAt) }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (response.status === 401) setGmailAccessToken("");
+        throw new Error(result.error || "Gmail could not send the intake copy.");
+      }
+      record.approvalCopyEmailStatus = "sent";
+      record.approvalCopyEmailSentAt = result.sentAt;
+      record.approvalCopyEmailRecipient = result.recipient || GOOGLE_OWNER_EMAIL;
+      const saved = await persist(next);
+      window.alert(saved
+        ? `Approved intake copy sent to ${GOOGLE_OWNER_EMAIL}. The complete form is archived in Google Sheets.`
+        : `The email was sent to ${GOOGLE_OWNER_EMAIL}, but the sent status could not be saved to Google Sheets.`);
+    } catch (failure) {
+      record.approvalCopyEmailStatus = "failed";
+      await persist(next);
+      window.alert(`The intake approval and archive remain saved. The email copy was not sent. ${failure.message || "Try again after reconnecting Gmail."}`);
+    } finally {
+      setEmailBusyId(null);
+    }
+  };
 
   const decide = async (applicant, status) => {
     const next = JSON.parse(JSON.stringify(data));
@@ -844,12 +903,17 @@ function IntakeApprovalsTab({ data, persist, addAudit, addNotification }) {
         ? `Your program application has been approved. Your confirmed assignment is Room ${record.room}, Bed ${record.bed}. (Simulated email.)`
         : "Your residency application was not approved at this time. Please contact the program coordinator with any questions. (Simulated email.)");
     }
-    await persist(next);
+    const saved = await persist(next);
+    if (!saved) {
+      window.alert("The intake decision could not be saved to Google Sheets. Reconnect as Owner and try again.");
+      return;
+    }
+    if (status === "approved" && record.application) await sendCopy(record.id, next);
   };
 
   return (
     <div>
-      <Panel title="Pending intake applications" subtitle="Review the full packet. Confirm the rate and sleeping space with the participant present before approval.">
+      <Panel title="Pending intake applications" subtitle={`Review the full packet and confirm final terms with the participant. Approval archives the full intake in Google Sheets and emails a copy to ${GOOGLE_OWNER_EMAIL}. Google asks for Gmail send permission the first time.`}>
         {pending.length === 0 ? <EmptyState text="No intake applications are waiting for review." /> : (
           <div style={{ display: "grid", gap: 10 }}>
             {pending.map(applicant => (
@@ -892,7 +956,16 @@ function IntakeApprovalsTab({ data, persist, addAudit, addNotification }) {
       <Panel title="Recent intake decisions">
         {reviewed.length === 0 ? <EmptyState text="No applications have been reviewed yet." /> : (
           <div style={{ display: "grid", gap: 6 }}>
-            {reviewed.map(applicant => <div key={applicant.id} style={listRow}><span>{applicant.name} · Room {applicant.room}, Bed {applicant.bed}</span><Badge tone={applicant.approvalStatus === "approved" ? "accent" : "red"}>{applicant.approvalStatus}</Badge></div>)}
+            {reviewed.map(applicant => <div key={applicant.id} style={{ ...listRow, gap: 10, flexWrap: "wrap" }}>
+              <span>{applicant.name} · Room {applicant.room}, Bed {applicant.bed}</span>
+              <Badge tone={applicant.approvalStatus === "approved" ? "accent" : "red"}>{applicant.approvalStatus}</Badge>
+              {applicant.approvalStatus === "approved" && applicant.application && <>
+                <span style={{ color: theme.inkSoft, fontSize: 12 }}>Email copy: {applicant.approvalCopyEmailStatus || "not sent"}</span>
+                <button type="button" disabled={emailBusyId === applicant.id} onClick={() => sendCopy(applicant.id, data)} style={btnSecondary}>
+                  {emailBusyId === applicant.id ? "Sending…" : applicant.approvalCopyEmailSentAt ? "Resend intake copy" : "Send intake copy"}
+                </button>
+              </>}
+            </div>)}
           </div>
         )}
       </Panel>

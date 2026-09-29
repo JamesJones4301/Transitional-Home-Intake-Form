@@ -41,6 +41,7 @@ function rows(data) {
     "Daily Reports": (data.dailyReports || []).map(r => [r.id, iso(r.createdAt), r.managerName || "", r.residents || "", r.summary || "", r.actionTaken || ""]),
     "Incident Reports": (data.incidentReports || []).map(r => [r.id, iso(r.createdAt), r.managerName || "", r.residents || "", r.summary || "", r.actionTaken || ""]),
     "Staff Forms": (data.staffForms || []).map(r => [r.id, iso(r.createdAt), r.formType || "", r.formLabel || "", r.fields?.participant || "", r.fields?.staffName || "", JSON.stringify(r.fields || {})]),
+    "Approved Intake Forms": (data.tenants || []).filter(t => t.approvalStatus === "approved" && t.application).map(t => [t.id, t.name || "", iso(t.submittedAt), iso(t.reviewedAt), t.reviewedBy || "", t.application.packetVersion || "", JSON.stringify({ applicant: t.application.applicant || {}, acknowledgments: t.application.acknowledgments || {}, initials: t.application.initials || {}, signatures: t.application.signatures || {}, signedAt: t.application.signedAt || "", finalTerms: t.application.finalTerms || {}, approvalCopyEmailStatus: t.approvalCopyEmailStatus || "", approvalCopyEmailSentAt: iso(t.approvalCopyEmailSentAt), approvalCopyRecipient: t.approvalCopyRecipient || "" })]),
     "Program Settings": [["Coordinator Name", data.settings?.managerName || ""], ["Coordinator Phone", data.settings?.managerPhone || ""]],
     "Audit Log": data.auditLog.map(a => [a.id, iso(a.timestamp), a.actor || "", a.action || "", a.entityType || "", a.entityId || "", a.detail || ""]),
     Notifications: data.notifications.map(n => [n.id, n.to || "", n.channel || "", n.message || "", "queued", iso(n.timestamp), ""]),
@@ -76,12 +77,13 @@ export async function writeState(data) {
   const safe = { ...EMPTY_STATE, ...data, settings: { ...EMPTY_STATE.settings, ...(data.settings || {}) } };
   const sheetRows = rows(safe);
   await ensureTabs(client, Object.keys(sheetRows).concat("Portal State"));
-  await client.spreadsheets.values.batchClear({ spreadsheetId: SPREADSHEET_ID, requestBody: { ranges: ["Residents!A2:Q1000", "'Check-Ins'!A2:H1000", "'Overnight Requests'!A2:M1000", "'Daily Reports'!A2:F1000", "'Incident Reports'!A2:F1000", "'Staff Forms'!A2:G2001", "'Program Settings'!A2:C1000", "'Audit Log'!A2:G2001", "Notifications!A2:G2001"] } });
+  await client.spreadsheets.values.batchClear({ spreadsheetId: SPREADSHEET_ID, requestBody: { ranges: ["Residents!A2:Q1000", "'Check-Ins'!A2:H1000", "'Overnight Requests'!A2:M1000", "'Daily Reports'!A2:F1000", "'Incident Reports'!A2:F1000", "'Staff Forms'!A2:G2001", "'Approved Intake Forms'!A2:G2001", "'Program Settings'!A2:C1000", "'Audit Log'!A2:G2001", "Notifications!A2:G2001"] } });
   const updates = [
     { range: "'Portal State'!A1", values: [[JSON.stringify(safe)]] },
     { range: "'Daily Reports'!A1:F1", values: [["Record ID", "Submitted At", "Staff Member", "Participants", "Report Summary", "Action Taken"]] },
     { range: "'Incident Reports'!A1:F1", values: [["Record ID", "Submitted At", "Staff Member", "Participants", "Incident Summary", "Action Taken"]] },
     { range: "'Staff Forms'!A1:G1", values: [["Record ID", "Submitted At", "Form Type", "Form Name", "Participant", "Staff Member", "Form Details (JSON)"]] },
+    { range: "'Approved Intake Forms'!A1:G1", values: [["Record ID", "Participant", "Submitted At", "Approved At", "Approved By", "Packet Version", "Complete Intake Record (JSON)"]] },
     { range: "'Overnight Requests'!D1", values: [["Stay Location"]] },
     { range: "'Overnight Requests'!K1:M1", values: [["Street Address", "Person Staying With", "Relationship"]] },
   ];
