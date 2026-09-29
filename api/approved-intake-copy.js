@@ -29,7 +29,8 @@ function approvedIntakeHtml(record) {
     "Room": record.room,
     "Bed": record.bed,
     "Monthly rate": record.monthlyRate ? `$${record.monthlyRate}` : "",
-    "Program start date": finalTerms.programStartDate || "",
+    "Intake month and year": finalTerms.intakeMonth || "",
+    "Confirmed exact move-in date": finalTerms.programStartDate || "",
     "Participant final signature": finalTerms.participantSignature || "",
     "Ashrei representative": finalTerms.ashreiRepresentative || "",
   };

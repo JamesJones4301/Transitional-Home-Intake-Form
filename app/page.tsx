@@ -877,14 +877,14 @@ function IntakeApprovalsTab({ data, persist, addAudit, addNotification }) {
     if (status === "approved") {
       const terms = { room: record.room, bed: record.bed, monthlyRate: record.monthlyRate, ...(finalTerms[record.id] || {}) };
       if (record.application) {
-        if (!terms.room?.trim() || !terms.bed?.trim() || !terms.programStartDate || !Number.isFinite(Number(terms.monthlyRate)) || Number(terms.monthlyRate) < 900 || terms.participantSignature?.trim().replace(/\s+/g, " ").toLowerCase() !== record.name.trim().replace(/\s+/g, " ").toLowerCase() || !terms.staffSignature?.trim()) {
-          window.alert("With the participant present, enter the confirmed room, bed, start date, monthly fee, participant signature, and Ashrei representative name before approval.");
+        if (!terms.room?.trim() || !terms.bed?.trim() || !terms.intakeMonth || !terms.programStartDate || !Number.isFinite(Number(terms.monthlyRate)) || Number(terms.monthlyRate) < 900 || terms.participantSignature?.trim().replace(/\s+/g, " ").toLowerCase() !== record.name.trim().replace(/\s+/g, " ").toLowerCase() || !terms.staffSignature?.trim()) {
+          window.alert("Enter the intake month and year, confirmed room and bed, exact move-in date, monthly fee, participant signature, and Ashrei representative name before approval.");
           return;
         }
         record.room = terms.room.trim(); record.bed = terms.bed.trim();
         record.admissionDate = new Date(`${terms.programStartDate}T12:00:00`).getTime();
         record.monthlyRate = Number(terms.monthlyRate);
-        record.application.finalTerms = { room: record.room, bed: record.bed, programStartDate: terms.programStartDate, monthlyRate: record.monthlyRate, participantSignature: terms.participantSignature.trim(), ashreiRepresentative: terms.staffSignature.trim(), signedAt: Date.now() };
+        record.application.finalTerms = { room: record.room, bed: record.bed, intakeMonth: terms.intakeMonth, programStartDate: terms.programStartDate, monthlyRate: record.monthlyRate, participantSignature: terms.participantSignature.trim(), ashreiRepresentative: terms.staffSignature.trim(), signedAt: Date.now() };
         record.feeAssignmentPending = false; record.leaseSigned = true;
       }
       const conflict = next.tenants.find(t => t.id !== record.id && t.active && (t.room || "").toLowerCase() === (record.room || "").toLowerCase() && (t.bed || "").toLowerCase() === (record.bed || "").toLowerCase());
@@ -923,6 +923,7 @@ function IntakeApprovalsTab({ data, persist, addAudit, addNotification }) {
                     <div style={{ fontWeight: 600 }}>{applicant.name}</div>
                     <div style={{ fontSize: 13, color: theme.inkSoft }}>{applicant.phone} · {applicant.email || "No email"}</div>
                     <div style={{ fontSize: 13, color: theme.inkSoft, marginTop: 3 }}>Submitted {fmtTime(applicant.submittedAt)} · Assignment {applicant.room && applicant.bed ? `Room ${applicant.room}, Bed ${applicant.bed}` : "pending"}</div>
+                    <div style={{ fontSize: 13, color: theme.inkSoft, marginTop: 3 }}>Participant requested move-in: {applicant.application?.applicant?.preferredMoveIn || "Not provided"}</div>
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
                     <button aria-label={`Approve ${applicant.name}`} onClick={() => decide(applicant, "approved")} style={btnSmallPrimary}><Check size={14} /></button>
@@ -940,9 +941,10 @@ function IntakeApprovalsTab({ data, persist, addAudit, addNotification }) {
                     <Field label="Confirmed room"><input value={finalTerms[applicant.id]?.room || applicant.room || ""} onChange={e => setTerm(applicant.id, "room", e.target.value)} style={input} /></Field>
                     <Field label="Confirmed bed"><input value={finalTerms[applicant.id]?.bed || applicant.bed || ""} onChange={e => setTerm(applicant.id, "bed", e.target.value)} style={input} /></Field>
                     <Field label="Confirmed monthly fee ($)"><input type="number" min="900" value={finalTerms[applicant.id]?.monthlyRate || applicant.monthlyRate || ""} onChange={e => setTerm(applicant.id, "monthlyRate", e.target.value)} style={input} /></Field>
-                    <Field label="Program start date"><input type="date" value={finalTerms[applicant.id]?.programStartDate || ""} onChange={e => setTerm(applicant.id, "programStartDate", e.target.value)} style={input} /></Field>
+                    <Field label="Intake month and year (historical record)"><input type="month" value={finalTerms[applicant.id]?.intakeMonth || ""} onChange={e => setTerm(applicant.id, "intakeMonth", e.target.value)} style={input} /></Field>
+                    <Field label="Confirmed exact move-in date"><input type="date" value={finalTerms[applicant.id]?.programStartDate || ""} onChange={e => setTerm(applicant.id, "programStartDate", e.target.value)} style={input} /></Field>
                   </div>
-                  <p style={{ fontSize: 12, color: theme.inkSoft, margin: 0 }}>Read the final fee, room, bed, and start date aloud with the participant. The participant types their own full legal name below. Save or print this record for the participant.</p>
+                  <p style={{ fontSize: 12, color: theme.inkSoft, margin: 0 }}>Record the intake month and year for the historical record, then confirm the exact move-in date with the participant. The original submission and signature timestamps stay recorded. Read the final fee, room, bed, and date aloud before approval. The participant types their own full legal name below. Save or print this record for the participant.</p>
                   <div className="two-col-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, width: "100%" }}>
                     <Field label="Participant signature for confirmed terms"><input value={finalTerms[applicant.id]?.participantSignature || ""} onChange={e => setTerm(applicant.id, "participantSignature", e.target.value)} style={input} /></Field>
                     <Field label="Authorized Ashrei representative"><input value={finalTerms[applicant.id]?.staffSignature || ""} onChange={e => setTerm(applicant.id, "staffSignature", e.target.value)} style={input} /></Field>
