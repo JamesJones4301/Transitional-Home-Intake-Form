@@ -5,7 +5,7 @@ import React, { useState } from "react";
 const PACKET_VERSION = "Client View, September 28, 2026 (SL.19-SL.32)";
 const INITIAL_SECTIONS = ["agreement", "termination", "rules", "schedule", "medication", "curfew", "accountability", "property", "rights"];
 const SIGNATURE_SECTIONS = ["application", "agreement", "fee", "faith", "testing", "release", "receipt"];
-const REQUIRED_ACKS = ["sobriety", "houseRules", "communitySafety", "respect", "feeTerms", "testing", "medication", "curfew", "visitors", "accountability", "property", "rights", "documents", "hygiene", "curseJar", "backgroundCheck", "electronicSignature"];
+const REQUIRED_ACKS = ["sobriety", "houseRules", "communitySafety", "respect", "feeTerms", "testing", "medication", "curfew", "visitors", "accountability", "property", "rights", "documents", "hygiene", "backgroundCheck", "electronicSignature"];
 
 const empty = {
   name: "", preferredName: "", birthDate: "", adult: "", phone: "", email: "", currentAddress: "", referralSource: "",
@@ -193,7 +193,6 @@ export default function IntakeForm({ onDone }: { onDone: () => void }) {
       <Section title="14. Move-in and house commitments">
         <p>Before entering an assigned room, wash and dry washable clothing and fabrics as directed with the program-provided pest-control laundry product, shower, and report suspected pests. A $1 curse jar applies to cursing or unruly behavior toward another participant.</p>
         {check("hygiene", "I understand the move-in laundry and shower procedure.")}
-        {check("curseJar", "I acknowledge the $1 curse jar commitment described above.")}
       </Section>
 
       <Section title="15. Application, document receipt, and signatures">
