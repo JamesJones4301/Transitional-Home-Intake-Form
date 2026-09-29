@@ -82,6 +82,7 @@ export default function IntakeForm({ onDone }: { onDone: () => void }) {
     <form onSubmit={submit} className="packet-form">
       <fieldset disabled={submitted} className="packet-completed-fields">
       <Section title="1. Applicant and admission information" note="Adults who live independently in a shared residence may apply. Ashrei reviews eligibility and requested accommodations individually.">
+        <div style={{ padding: "12px 14px", border: "1px solid #d8d7cf", borderRadius: 8, background: "#fff", marginBottom: 12 }}><strong>Background check acknowledgment</strong>{check("backgroundCheck", "I understand that a background check will be completed on all participants to verify past information.")}</div>
         <div className="packet-two"><Field label="Full legal name">{input("name", true)}</Field><Field label="Preferred name">{input("preferredName")}</Field>
           <Field label="Date of birth">{input("birthDate", true, "date")}</Field><Field label="Are you 18 or older?">{select("adult", ["Yes", "No"])}</Field>
           <Field label="Phone">{input("phone", true, "tel")}</Field><Field label="Email">{input("email", false, "email")}</Field></div>
@@ -98,7 +99,6 @@ export default function IntakeForm({ onDone }: { onDone: () => void }) {
         <Field label="Primary substances previously used">{area("priorSubstances")}</Field><Field label="Current treatment or recovery supports">{area("treatmentSupports")}</Field>
         <Field label="Officer, court, or case contact, if applicable">{input("legalContact")}</Field>
         <Field label="Are you currently required to register as a sex offender?">{select("registryRequirement", ["Yes", "No", "Prefer to discuss with staff"])}</Field>
-        {check("backgroundCheck", "I understand that a background check will be completed on all participants to verify past information.")}
         <div className="packet-two"><Field label="One-year goals">{area("goalOneYear")}</Field><Field label="Five-year goals">{area("goalFiveYears")}</Field></div><Field label="Ten-year goals">{area("goalTenYears")}</Field>
         {check("sobriety", "I agree to live free of alcohol and prohibited drugs.")}
         {check("houseRules", "I agree to follow the house rules, curfew, chores, testing, and required meetings.")}
