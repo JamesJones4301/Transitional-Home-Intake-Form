@@ -171,15 +171,15 @@ export default function IntakeForm({ onDone }: { onDone: () => void }) {
           <Field label="Primary emergency contact email">{input("emergencyEmail", false, "email")}</Field>
           <Field label="Secondary Contact">{input("secondaryName")}</Field>
           <Field label="Secondary Contact Phone">{input("secondaryPhone", false, "tel")}</Field></div>
-        <p className="packet-note">Program residence: Bird Pepper Place, 2017 Cheshire Dr, Austin, TX 78723. Ashrei Impact Foundation: 144 Drifter Ln, Jarrell, TX 76537. 737-344-4075 | ashreiimpactfoundation@gmail.com | www.ashreiimpactfoundation.org</p>
-        <p>Participant may authorize Ashrei to share or obtain only the information described below with the named person or organization. This authorization is voluntary except where disclosure is otherwise permitted or required by law.</p>
         <Field label="May Ashrei contact your emergency person in an emergency or when you appear to have abandoned the program and cannot be reached?">{select("emergencyPermission", ["Yes", "No"])}</Field>
+        <p>Participant may authorize Ashrei to share or obtain only the information described below with the named person or organization. This authorization is voluntary except where disclosure is otherwise permitted or required by law.</p>
         <Field label="Do you authorize any additional limited release of information?">{select("releaseAuthorized", ["Yes", "No"])}</Field>
-        {form.releaseAuthorized === "Yes" && <><Field label="Person / Organization">{input("releasePerson", true)}</Field>
-          <Field label="Information Authorized">{area("releaseInformation", true)}</Field>
-          <Field label="Purpose">{input("releasePurpose", true)}</Field><Field label="Expiration / Event">{input("releaseExpiration", true)}</Field>
-          <fieldset className="packet-fieldset"><legend>Authorized purposes, select all that apply</legend>{["Emergency contact and safety coordination", "Program participation/status updates", "Payment coordination", "Court/probation/reentry coordination", "Treatment/recovery resource coordination", "Other"].map(category => <label key={category} className="packet-check"><input type="checkbox" checked={form.releaseCategories.includes(category)} onChange={event => set("releaseCategories", event.target.checked ? [...form.releaseCategories, category] : form.releaseCategories.filter(item => item !== category))} />{category}</label>)}</fieldset>
-          {form.releaseCategories.includes("Other") && <Field label="Other purpose, please specify">{input("releaseOther", true)}</Field>}</>}
+        <div className="packet-two"><Field label="Person / Organization">{input("releasePerson", form.releaseAuthorized === "Yes")}</Field>
+          <Field label="Information Authorized">{area("releaseInformation", form.releaseAuthorized === "Yes")}</Field>
+          <Field label="Purpose">{input("releasePurpose", form.releaseAuthorized === "Yes")}</Field>
+          <Field label="Expiration / Event">{input("releaseExpiration", form.releaseAuthorized === "Yes")}</Field></div>
+        <fieldset className="packet-fieldset"><legend>Information and purposes authorized, select all that apply</legend>{["Emergency contact and safety coordination", "Program participation/status updates", "Payment coordination", "Court/probation/reentry coordination", "Treatment/recovery resource coordination", "Other"].map(category => <label key={category} className="packet-check"><input type="checkbox" checked={form.releaseCategories.includes(category)} onChange={event => set("releaseCategories", event.target.checked ? [...form.releaseCategories, category] : form.releaseCategories.filter(item => item !== category))} />{category}</label>)}</fieldset>
+        <Field label="Other, please specify">{input("releaseOther", form.releaseAuthorized === "Yes" && form.releaseCategories.includes("Other"))}</Field>
         <p>A No response does not authorize an additional release.</p>
         {sign("release", "Participant Signature")}
         <Field label="Participant Signature Date">{input("releaseSignatureDate", true, "date")}</Field>
