@@ -12,7 +12,7 @@ const empty = {
   recoveryStatus: "", recoveryOther: "", sobrietyDate: "", priorSubstances: "", treatmentSupports: "", legalStatus: "", legalOther: "", legalContact: "",
   independentLiving: "", registryRequirement: "", concerns: "", medicationStatus: "", medications: "", faithParticipation: "", faithBackground: "",
   goalOneYear: "", goalFiveYears: "", goalTenYears: "", emergencyName: "", emergencyRelationship: "", emergencyPhone: "", emergencyEmail: "",
-  secondaryName: "", secondaryPhone: "", emergencyPermission: "", releaseAuthorized: "", releasePerson: "", releaseInformation: "", releasePurpose: "", releaseExpiration: "", releaseCategories: [] as string[],
+  secondaryName: "", secondaryPhone: "", emergencyPermission: "", releaseAuthorized: "", releasePerson: "", releaseInformation: "", releasePurpose: "", releaseExpiration: "", releaseCategories: [] as string[], releaseOther: "", releaseSignatureDate: "",
   paymentSource: "", paymentOther: "", canPayAtMoveIn: "", nextStep: "", preferredMoveIn: "", room: "", bed: "", monthlyRate: "", paymentFrequency: "Monthly",
 };
 
@@ -54,6 +54,7 @@ export default function IntakeForm({ onDone }: { onDone: () => void }) {
     if (SIGNATURE_SECTIONS.some(key => signatures[key]?.trim().replace(/\s+/g, " ").toLowerCase() !== fullName)) return setError("Type your full legal name in each signature field.");
     if (form.medicationStatus === "Yes" && !form.medications.trim()) return setError("List your current medications, purpose, and prescriber or notes.");
     if (form.releaseAuthorized === "Yes" && (!form.releasePerson.trim() || !form.releaseInformation.trim() || !form.releasePurpose.trim() || !form.releaseExpiration.trim())) return setError("Complete the limited release details or choose No.");
+    if (form.releaseAuthorized === "Yes" && form.releaseCategories.includes("Other") && !form.releaseOther.trim()) return setError("Describe the other authorized purpose.");
     if (form.monthlyRate && Number(form.monthlyRate) < 900) return setError("The packet lists a starting rate of $900. Ask staff to confirm any other rate in writing.");
     setSubmitting(true);
     try {
@@ -162,17 +163,26 @@ export default function IntakeForm({ onDone }: { onDone: () => void }) {
         {initial("schedule", "Weekly schedule")}
       </Section>
 
-      <Section title="11. Emergency contacts and limited release">
-        <div className="packet-two"><Field label="Primary emergency contact or next of kin">{input("emergencyName", true)}</Field><Field label="Relationship">{input("emergencyRelationship", true)}</Field>
-          <Field label="Phone">{input("emergencyPhone", true, "tel")}</Field><Field label="Email">{input("emergencyEmail", false, "email")}</Field>
-          <Field label="Secondary contact">{input("secondaryName")}</Field><Field label="Secondary phone">{input("secondaryPhone", false, "tel")}</Field></div>
+      <Section title="11. Emergency Contact & Release of Information" note="BIRD PEPPER PLACE | FAITH-CENTERED SOBER-LIVING PROGRAM">
+        <div className="packet-two"><Field label="Participant — full legal name">{input("name", true)}</Field>
+          <Field label="Primary Emergency Contact">{input("emergencyName", true)}</Field>
+          <Field label="Relationship">{input("emergencyRelationship", true)}</Field>
+          <Field label="Primary Emergency Contact Phone">{input("emergencyPhone", true, "tel")}</Field>
+          <Field label="Primary emergency contact email">{input("emergencyEmail", false, "email")}</Field>
+          <Field label="Secondary Contact">{input("secondaryName")}</Field>
+          <Field label="Secondary Contact Phone">{input("secondaryPhone", false, "tel")}</Field></div>
+        <p className="packet-note">Program residence: Bird Pepper Place, 2017 Cheshire Dr, Austin, TX 78723. Ashrei Impact Foundation: 144 Drifter Ln, Jarrell, TX 76537. 737-344-4075 | ashreiimpactfoundation@gmail.com | www.ashreiimpactfoundation.org</p>
+        <p>Participant may authorize Ashrei to share or obtain only the information described below with the named person or organization. This authorization is voluntary except where disclosure is otherwise permitted or required by law.</p>
         <Field label="May Ashrei contact your emergency person in an emergency or when you appear to have abandoned the program and cannot be reached?">{select("emergencyPermission", ["Yes", "No"])}</Field>
         <Field label="Do you authorize any additional limited release of information?">{select("releaseAuthorized", ["Yes", "No"])}</Field>
-        {form.releaseAuthorized === "Yes" && <><Field label="Person or organization">{input("releasePerson", true)}</Field>
-          <Field label="Exactly what information may be shared or obtained">{area("releaseInformation", true)}</Field>
-          <Field label="Purpose">{input("releasePurpose", true)}</Field><Field label="Expiration date or event">{input("releaseExpiration", true)}</Field>
-          <fieldset className="packet-fieldset"><legend>Authorized categories, select all that apply</legend>{["Emergency/safety coordination", "Program status", "Payment coordination", "Court/probation/reentry", "Treatment/recovery resources", "Other"].map(category => <label key={category} className="packet-check"><input type="checkbox" checked={form.releaseCategories.includes(category)} onChange={event => set("releaseCategories", event.target.checked ? [...form.releaseCategories, category] : form.releaseCategories.filter(item => item !== category))} />{category}</label>)}</fieldset></>}
-        <p>Additional disclosure is voluntary except as otherwise allowed or required by law. A No response does not authorize the additional release.</p>{sign("release", "Emergency contact and release choice")}
+        {form.releaseAuthorized === "Yes" && <><Field label="Person / Organization">{input("releasePerson", true)}</Field>
+          <Field label="Information Authorized">{area("releaseInformation", true)}</Field>
+          <Field label="Purpose">{input("releasePurpose", true)}</Field><Field label="Expiration / Event">{input("releaseExpiration", true)}</Field>
+          <fieldset className="packet-fieldset"><legend>Authorized purposes, select all that apply</legend>{["Emergency contact and safety coordination", "Program participation/status updates", "Payment coordination", "Court/probation/reentry coordination", "Treatment/recovery resource coordination", "Other"].map(category => <label key={category} className="packet-check"><input type="checkbox" checked={form.releaseCategories.includes(category)} onChange={event => set("releaseCategories", event.target.checked ? [...form.releaseCategories, category] : form.releaseCategories.filter(item => item !== category))} />{category}</label>)}</fieldset>
+          {form.releaseCategories.includes("Other") && <Field label="Other purpose, please specify">{input("releaseOther", true)}</Field>}</>}
+        <p>A No response does not authorize an additional release.</p>
+        {sign("release", "Participant Signature")}
+        <Field label="Participant Signature Date">{input("releaseSignatureDate", true, "date")}</Field>
       </Section>
 
       <Section title="12. Accountability, discharge, and lawful possession">
