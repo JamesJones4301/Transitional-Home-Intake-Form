@@ -877,14 +877,14 @@ function IntakeApprovalsTab({ data, persist, addAudit, addNotification }) {
     if (status === "approved") {
       const terms = { room: record.room, bed: record.bed, monthlyRate: record.monthlyRate, ...(finalTerms[record.id] || {}) };
       if (record.application) {
-        if (!terms.room?.trim() || !terms.bed?.trim() || !terms.intakeMonth || !terms.programStartDate || !Number.isFinite(Number(terms.monthlyRate)) || Number(terms.monthlyRate) < 900 || terms.participantSignature?.trim().replace(/\s+/g, " ").toLowerCase() !== record.name.trim().replace(/\s+/g, " ").toLowerCase() || !terms.staffSignature?.trim()) {
-          window.alert("Enter the intake month and year, confirmed room and bed, exact move-in date, monthly fee, participant signature, and Ashrei representative name before approval.");
+        if (!terms.room?.trim() || !terms.bed?.trim() || !terms.intakeMonth || !terms.programStartDate || !Number.isFinite(Number(terms.monthlyRate)) || Number(terms.monthlyRate) < 900 || !terms.reviewedWithParticipant || !terms.staffSignature?.trim()) {
+          window.alert("Enter the intake month and year, confirmed room and bed, exact move-in date, monthly fee, confirm you reviewed these terms with the participant, and enter your Ashrei representative name before approval.");
           return;
         }
         record.room = terms.room.trim(); record.bed = terms.bed.trim();
         record.admissionDate = new Date(`${terms.programStartDate}T12:00:00`).getTime();
         record.monthlyRate = Number(terms.monthlyRate);
-        record.application.finalTerms = { room: record.room, bed: record.bed, intakeMonth: terms.intakeMonth, programStartDate: terms.programStartDate, monthlyRate: record.monthlyRate, participantSignature: terms.participantSignature.trim(), ashreiRepresentative: terms.staffSignature.trim(), signedAt: Date.now() };
+        record.application.finalTerms = { room: record.room, bed: record.bed, intakeMonth: terms.intakeMonth, programStartDate: terms.programStartDate, monthlyRate: record.monthlyRate, reviewedWithParticipant: true, ashreiRepresentative: terms.staffSignature.trim(), reviewedAt: Date.now() };
         record.feeAssignmentPending = false; record.leaseSigned = true;
       }
       const conflict = next.tenants.find(t => t.id !== record.id && t.active && (t.room || "").toLowerCase() === (record.room || "").toLowerCase() && (t.bed || "").toLowerCase() === (record.bed || "").toLowerCase());
@@ -944,11 +944,9 @@ function IntakeApprovalsTab({ data, persist, addAudit, addNotification }) {
                     <Field label="Intake month and year (historical record)"><input type="month" value={finalTerms[applicant.id]?.intakeMonth || ""} onChange={e => setTerm(applicant.id, "intakeMonth", e.target.value)} style={input} /></Field>
                     <Field label="Confirmed exact move-in date"><input type="date" value={finalTerms[applicant.id]?.programStartDate || ""} onChange={e => setTerm(applicant.id, "programStartDate", e.target.value)} style={input} /></Field>
                   </div>
-                  <p style={{ fontSize: 12, color: theme.inkSoft, margin: 0 }}>Record the intake month and year for the historical record, then confirm the exact move-in date with the participant. The original submission and signature timestamps stay recorded. Read the final fee, room, bed, and date aloud before approval. The participant types their own full legal name below. Save or print this record for the participant.</p>
-                  <div className="two-col-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, width: "100%" }}>
-                    <Field label="Participant signature for confirmed terms"><input value={finalTerms[applicant.id]?.participantSignature || ""} onChange={e => setTerm(applicant.id, "participantSignature", e.target.value)} style={input} /></Field>
-                    <Field label="Authorized Ashrei representative"><input value={finalTerms[applicant.id]?.staffSignature || ""} onChange={e => setTerm(applicant.id, "staffSignature", e.target.value)} style={input} /></Field>
-                  </div>
+                  <p style={{ fontSize: 12, color: theme.inkSoft, margin: 0 }}>Record the intake month and year for the historical record, then confirm the exact move-in date with the participant. The original submission and signatures stay recorded. Review the final fee, room, bed, and date with the participant before approval. This staff record does not replace the participant's original signature.</p>
+                  <label style={{ display: "flex", gap: 8, alignItems: "flex-start", width: "100%", fontSize: 13 }}><input type="checkbox" checked={Boolean(finalTerms[applicant.id]?.reviewedWithParticipant)} onChange={e => setTerm(applicant.id, "reviewedWithParticipant", e.target.checked)} /> I reviewed the confirmed room, bed, monthly fee, and exact move-in date with the participant.</label>
+                  <Field label="Authorized Ashrei representative"><input value={finalTerms[applicant.id]?.staffSignature || ""} onChange={e => setTerm(applicant.id, "staffSignature", e.target.value)} style={input} /></Field>
                 </>}
               </div>
             ))}
