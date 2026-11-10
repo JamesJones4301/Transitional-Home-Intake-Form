@@ -4,7 +4,9 @@ import { failureDetails, sendFailureAlert } from "./_intake-failure-alert.js";
 const recent = new Map();
 export default async function handler(req, res) {
   if (req.method !== "POST") { res.setHeader("Allow", "POST"); return res.status(405).json({ error: "Method not allowed." }); }
-  if (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) return res.status(403).json({ error: "Origin not allowed." });
+  let sameOrigin = false;
+  try { sameOrigin = Boolean(req.headers.origin) && new URL(req.headers.origin).host === req.headers.host; } catch { /* Invalid origin. */ }
+  if (!sameOrigin) return res.status(403).json({ error: "Origin not allowed." });
   const details = failureDetails(req.body, "Submission response could not be confirmed");
   if (!details) return res.status(400).json({ error: "Contact details are required." });
   const now = Date.now();
