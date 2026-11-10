@@ -19,6 +19,28 @@ const STAFF_REQUIRED = {
 };
 const textMap = (object, keys) => Object.fromEntries(keys.map(key => [key, clean(object?.[key]).slice(0, 4000)]));
 
+async function sendIntakeAlert(tenant) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.INTAKE_ALERT_FROM;
+  if (!apiKey || !from) return { sent: false, error: "Email delivery is not configured." };
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from,
+        to: ["ashreiimpactfoundation@gmail.com"],
+        subject: `New participant intake submitted: ${tenant.name.replace(/[\r\n]/g, " ")}`,
+        text: `A new participant intake was submitted for ${tenant.name}.\nSubmitted: ${new Date(tenant.submittedAt).toLocaleString("en-US", { timeZone: "America/Chicago" })} Central time.\n\nSign in to the Ashrei owner portal to review the complete application. This email does not contain the participant's private answers.`,
+      }),
+    });
+    if (!response.ok) return { sent: false, error: `Email provider returned HTTP ${response.status}.` };
+    return { sent: true };
+  } catch (error) {
+    return { sent: false, error: error instanceof Error ? error.message : "Email request failed." };
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") { res.setHeader("Allow", "POST"); return res.status(405).json({ error: "Method not allowed." }); }
   try {
@@ -103,7 +125,9 @@ export default async function handler(req, res) {
     data.tenants.push(tenant);
     data.auditLog.unshift({ id: id(), timestamp: submittedAt, actor: name, action: "intake_submitted", detail: "Submitted client packet for review. Assignment and rate require staff confirmation." });
     await writeState(data);
-    return res.status(201).json({ ok: true });
+    const alert = await sendIntakeAlert(tenant);
+    if (!alert.sent) console.error("Intake alert failed after application was saved:", alert.error);
+    return res.status(201).json({ ok: true, notificationSent: alert.sent });
   } catch (error) {
     return res.status(500).json({ error: "Your application could not be saved right now. Please try again or contact Ashrei Impact Foundation." });
   }
