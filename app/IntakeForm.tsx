@@ -56,16 +56,26 @@ export default function IntakeForm({ onDone }: { onDone: () => void }) {
     if (form.releaseAuthorized === "Yes" && (!form.releasePerson.trim() || !form.releaseInformation.trim() || !form.releasePurpose.trim() || !form.releaseExpiration.trim())) return setError("Complete the limited release details or choose No.");
     if (form.releaseAuthorized === "Yes" && form.releaseCategories.includes("Other") && !form.releaseOther.trim()) return setError("Describe the other authorized purpose.");
     if (form.monthlyRate && Number(form.monthlyRate) < 900) return setError("The packet lists a starting rate of $900. Ask staff to confirm any other rate in writing.");
+    const attemptId = crypto.randomUUID();
     setSubmitting(true);
     try {
       const response = await fetch("/api/public-submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
-        type: "intake", applicant: form, acknowledgments: acks, initials, signatures,
+        type: "intake", attemptId, applicant: form, acknowledgments: acks, initials, signatures,
         documentVersion: PACKET_VERSION, agreementAccepted: true, screeningAccurate: true,
       }) });
-      const result: any = await response.json();
-      if (!response.ok) throw new Error(result.error || "Application could not be saved.");
+      if (!response.ok) {
+        if (response.status < 500) { const result = await response.json().catch(() => ({})); throw new Error(result.error || "Please review the application and try again."); }
+        throw new Error("We could not confirm your submission. Please call Ashrei at 737-344-4075 before submitting again.");
+      }
       setSubmitted(true);
-    } catch (failure: any) { setError(failure.message || "Application could not be saved. Please try again."); }
+    } catch (failure: any) {
+      const uncertain = !failure.message || failure.message.includes("could not confirm") || failure instanceof TypeError;
+      if (uncertain) {
+        // Never send the full intake packet through the fallback channel.
+        void fetch("/api/intake-failure", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ attemptId, applicant: { name: form.name, email: form.email, phone: form.phone } }) }).catch(() => {});
+      }
+      setError(uncertain ? "We could not confirm your submission. Please call Ashrei at 737-344-4075 before submitting again." : failure.message);
+    }
     finally { setSubmitting(false); }
   }
 
@@ -81,6 +91,7 @@ export default function IntakeForm({ onDone }: { onDone: () => void }) {
     </header>
     {submitted && <div className="packet-success" role="status"><strong>Application submitted for staff review.</strong> Keep this page open to print your completed answers. Staff will confirm your space and monthly rate in writing before move-in. <button type="button" onClick={() => window.print()}>Print or save copy</button><button type="button" onClick={onDone}>Back to home</button></div>}
     <form onSubmit={submit} className="packet-form">
+      <p className="packet-note">If a technical error prevents confirmation, Ashrei receives your name, email, and phone so staff can help. Your full application is not included in the error alert.</p>
       <fieldset disabled={submitted} className="packet-completed-fields">
       <Section title="1. Applicant and admission information" note="Adults who live independently in a shared residence may apply. Ashrei reviews eligibility and requested accommodations individually.">
         <div style={{ padding: "12px 14px", border: "1px solid #d8d7cf", borderRadius: 8, background: "#fff", marginBottom: 12 }}><strong>Background check acknowledgment</strong>{check("backgroundCheck", "I understand that a background check will be completed on all participants to verify past information.")}</div>
