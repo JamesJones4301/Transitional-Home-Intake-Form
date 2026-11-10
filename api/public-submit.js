@@ -20,24 +20,25 @@ const STAFF_REQUIRED = {
 const textMap = (object, keys) => Object.fromEntries(keys.map(key => [key, clean(object?.[key]).slice(0, 4000)]));
 
 async function sendIntakeAlert(tenant) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.INTAKE_ALERT_FROM;
-  if (!apiKey || !from) return { sent: false, error: "Email delivery is not configured." };
+  const url = process.env.INTAKE_ALERT_WEBHOOK_URL;
+  const token = process.env.INTAKE_ALERT_WEBHOOK_TOKEN;
+  if (!url || !token) return { sent: false, error: "Google alert webhook is not configured." };
   try {
-    const response = await fetch("https://api.resend.com/emails", {
+    const response = await fetch(url, {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        from,
-        to: ["ashreiimpactfoundation@gmail.com"],
-        subject: `New participant intake submitted: ${tenant.name.replace(/[\r\n]/g, " ")}`,
-        text: `A new participant intake was submitted for ${tenant.name}.\nSubmitted: ${new Date(tenant.submittedAt).toLocaleString("en-US", { timeZone: "America/Chicago" })} Central time.\n\nSign in to the Ashrei owner portal to review the complete application. This email does not contain the participant's private answers.`,
+        token,
+        intakeId: tenant.id,
+        name: tenant.name,
+        submittedAt: tenant.submittedAt,
       }),
     });
-    if (!response.ok) return { sent: false, error: `Email provider returned HTTP ${response.status}.` };
+    const result = await response.json();
+    if (!response.ok || result.ok !== true) return { sent: false, error: "Google alert webhook did not confirm delivery." };
     return { sent: true };
   } catch (error) {
-    return { sent: false, error: error instanceof Error ? error.message : "Email request failed." };
+    return { sent: false, error: error instanceof Error ? error.message : "Google alert request failed." };
   }
 }
 
