@@ -1,5 +1,6 @@
 import { EMPTY_STATE, readState, writeState } from "./_sheets.js";
 import { authorizeStaff } from "./_staff-access.js";
+import { failureDetails, sendFailureAlert } from "./_intake-failure-alert.js";
 
 const id = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 const clean = value => String(value || "").trim();
@@ -130,6 +131,10 @@ export default async function handler(req, res) {
     if (!alert.sent) console.error("Intake alert failed after application was saved:", alert.error);
     return res.status(201).json({ ok: true, notificationSent: alert.sent });
   } catch (error) {
+    if (req.body?.type === "intake") {
+      const details = failureDetails(req.body, "Server could not save the application");
+      if (details && !await sendFailureAlert(details)) console.error("Could not notify owner about failed intake", details.attemptId);
+    }
     return res.status(500).json({ error: "Your application could not be saved right now. Please try again or contact Ashrei Impact Foundation." });
   }
 }
