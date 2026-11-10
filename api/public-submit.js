@@ -19,6 +19,29 @@ const STAFF_REQUIRED = {
 };
 const textMap = (object, keys) => Object.fromEntries(keys.map(key => [key, clean(object?.[key]).slice(0, 4000)]));
 
+async function sendIntakeAlert(tenant) {
+  const url = process.env.INTAKE_ALERT_WEBHOOK_URL;
+  const token = process.env.INTAKE_ALERT_WEBHOOK_TOKEN;
+  if (!url || !token) return { sent: false, error: "Google alert webhook is not configured." };
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token,
+        intakeId: tenant.id,
+        name: tenant.name,
+        submittedAt: tenant.submittedAt,
+      }),
+    });
+    const result = await response.json();
+    if (!response.ok || result.ok !== true) return { sent: false, error: "Google alert webhook did not confirm delivery." };
+    return { sent: true };
+  } catch (error) {
+    return { sent: false, error: error instanceof Error ? error.message : "Google alert request failed." };
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") { res.setHeader("Allow", "POST"); return res.status(405).json({ error: "Method not allowed." }); }
   try {
@@ -103,7 +126,9 @@ export default async function handler(req, res) {
     data.tenants.push(tenant);
     data.auditLog.unshift({ id: id(), timestamp: submittedAt, actor: name, action: "intake_submitted", detail: "Submitted client packet for review. Assignment and rate require staff confirmation." });
     await writeState(data);
-    return res.status(201).json({ ok: true });
+    const alert = await sendIntakeAlert(tenant);
+    if (!alert.sent) console.error("Intake alert failed after application was saved:", alert.error);
+    return res.status(201).json({ ok: true, notificationSent: alert.sent });
   } catch (error) {
     return res.status(500).json({ error: "Your application could not be saved right now. Please try again or contact Ashrei Impact Foundation." });
   }
