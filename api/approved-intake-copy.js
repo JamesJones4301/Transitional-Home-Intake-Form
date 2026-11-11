@@ -85,21 +85,6 @@ function approvedIntakeHtml(record) {
   return `<!doctype html><html><body style="font:15px Arial,sans-serif;color:#22332d;line-height:1.5"><h1 style="font:600 24px Arial,sans-serif">Approved participant intake copy</h1><p>This message contains the approved intake record for <strong>${escapeHtml(record.name)}</strong>. Every saved response appears beside the full question or acknowledgment text from the online intake. The program policy text is available in the linked client packet.</p>${section("Applicant questions and answers", application.applicant, APPLICANT_QUESTIONS)}${section("Required acknowledgments", application.acknowledgments, ACKNOWLEDGMENT_QUESTIONS)}${section("Participant initials", application.initials, INITIAL_QUESTIONS)}${section("Typed signatures", application.signatures, SIGNATURE_QUESTIONS)}${section("Final approval and assignment", approval)}<p style="margin-top:24px;color:#66736e">Packet: ${escapeHtml(application.packetVersion || "")} · Submitted: ${escapeHtml(application.signedAt ? new Date(application.signedAt).toLocaleString("en-US", { timeZone: "America/Chicago" }) : "")}</p></body></html>`;
 }
 
-function encodeMessage(to, subject, html) {
-  const subjectEncoded = Buffer.from(subject, "utf8").toString("base64");
-  const bodyEncoded = Buffer.from(html, "utf8").toString("base64").replace(/.{1,76}/g, "$&\r\n");
-  const message = [
-    `To: ${to}`,
-    `Subject: =?UTF-8?B?${subjectEncoded}?=`,
-    "MIME-Version: 1.0",
-    "Content-Type: text/html; charset=UTF-8",
-    "Content-Transfer-Encoding: base64",
-    "",
-    bodyEncoded,
-  ].join("\r\n");
-  return Buffer.from(message, "utf8").toString("base64url");
-}
-
 async function updateDelivery(data, record, status, sentAt = null) {
   record.approvalCopyEmailStatus = status;
   record.approvalCopyEmailRecipient = RECIPIENT;
@@ -112,7 +97,6 @@ export default async function handler(req, res) {
   let data;
   let record;
   try {
-    const token = clean((req.headers.authorization || "").replace(/^Bearer\s+/i, ""));
     await assertOwner(req);
     const body = req.body || {};
     const recordId = clean(body.recordId);
@@ -120,19 +104,19 @@ export default async function handler(req, res) {
     record = (data.tenants || []).find(tenant => tenant.id === recordId);
     if (!record || record.approvalStatus !== "approved" || !record.application) return res.status(404).json({ error: "An approved intake record was not found." });
     if (record.approvalCopyEmailSentAt && !body.force) return res.status(200).json({ ok: true, sentAt: record.approvalCopyEmailSentAt, recipient: RECIPIENT, alreadySent: true });
-    if (record.approvalCopyEmailStatus === "sending") return res.status(409).json({ error: "An intake copy email is already being sent for this application." });
-
+    const url = process.env.INTAKE_ALERT_WEBHOOK_URL;
+    const token = process.env.INTAKE_ALERT_WEBHOOK_TOKEN;
+    if (!url || !token) return res.status(503).json({ error: "The approved-copy email service is not configured. The intake remains archived." });
     await updateDelivery(data, record, "sending");
-    const subject = `Approved participant intake copy: ${record.name || "Participant"}`;
-    const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    const response = await fetch(url, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ raw: encodeMessage(RECIPIENT, subject, approvedIntakeHtml(record)) }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, type: "approved-copy", recordId, name: record.name, html: approvedIntakeHtml(record) }),
     });
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) {
+    if (!response.ok || result.ok !== true) {
       await updateDelivery(data, record, "failed");
-      return res.status(502).json({ error: result.error?.message || "Gmail could not send the intake copy. The approval and archive were saved." });
+      return res.status(502).json({ error: "The approved-copy email service did not confirm delivery. The approval and archive were saved." });
     }
 
     const sentAt = Date.now();
