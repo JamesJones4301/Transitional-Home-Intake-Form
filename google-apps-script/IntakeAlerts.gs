@@ -6,6 +6,7 @@ function doPost(e) {
     var expected = PropertiesService.getScriptProperties().getProperty('INTAKE_ALERT_WEBHOOK_TOKEN');
     if (!expected || !data.token || data.token !== expected) return json_({ ok: false });
     if (data.type === 'intake-failure') return sendFailureAlert_(data);
+    if (data.type === 'approved-copy') return sendApprovedCopy_(data);
 
     var intakeId = String(data.intakeId || '').trim();
     var name = String(data.name || '').replace(/[\r\n]/g, ' ').trim();
@@ -26,6 +27,20 @@ function doPost(e) {
     console.error('Intake alert failed: ' + error);
     return json_({ ok: false });
   }
+}
+
+function sendApprovedCopy_(data) {
+  var recordId = String(data.recordId || '').trim();
+  var name = String(data.name || '').replace(/[\r\n]/g, ' ').trim().slice(0, 120);
+  var html = String(data.html || '');
+  if (!/^[a-zA-Z0-9_-]{4,100}$/.test(recordId) || !name || !html.startsWith('<!doctype html>') || html.length > 500000) return json_({ ok: false });
+  MailApp.sendEmail({
+    to: 'ashreiimpactfoundation@gmail.com',
+    subject: 'Approved participant intake copy: ' + name,
+    body: 'Approved participant intake copy for ' + name + '. Open this message in an HTML-capable email client to review every saved question and answer.',
+    htmlBody: html
+  });
+  return json_({ ok: true });
 }
 
 function sendFailureAlert_(data) {
