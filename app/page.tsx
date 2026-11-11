@@ -85,18 +85,6 @@ function requestGoogleToken() {
   });
 }
 
-function requestGmailSendToken() {
-  return new Promise((resolve, reject) => {
-    const client = window.google.accounts.oauth2.initTokenClient({
-      client_id: GOOGLE_CLIENT_ID,
-      scope: "openid email https://www.googleapis.com/auth/gmail.send",
-      callback: response => response.error ? reject(new Error(response.error)) : resolve(response.access_token),
-      error_callback: () => reject(new Error("Google email permission was cancelled or blocked.")),
-    });
-    client.requestAccessToken({ prompt: "select_account" });
-  });
-}
-
 function iso(value) {
   if (!value) return "";
   const date = new Date(value);
@@ -296,6 +284,7 @@ export default function App() {
             readOnly={role === "owner"}
             googleUser={googleUser}
             syncStatus={syncStatus}
+            ownerToken={googleAccessToken}
           />
         )}
       </div>
@@ -549,7 +538,7 @@ function OvernightPanel({ tenant, data, persist, addAudit, eligibleForOvernight,
 
 /* ---------------- MANAGER / OWNER VIEW ---------------- */
 
-function ManagerView({ data, persist, addAudit, addNotification, readOnly, googleUser, syncStatus }) {
+function ManagerView({ data, persist, addAudit, addNotification, readOnly, googleUser, syncStatus, ownerToken }) {
   const [tab, setTab] = useState(readOnly ? "reports" : "today");
   const tabs = readOnly
     ? [["reports", "Reports"]]
@@ -567,7 +556,7 @@ function ManagerView({ data, persist, addAudit, addNotification, readOnly, googl
         ))}
       </div>
       {tab === "today" && <TodayTab data={data} />}
-      {tab === "intakes" && <IntakeApprovalsTab data={data} persist={persist} addAudit={addAudit} addNotification={addNotification} />}
+      {tab === "intakes" && <IntakeApprovalsTab data={data} persist={persist} addAudit={addAudit} addNotification={addNotification} ownerToken={ownerToken} />}
       {tab === "assignments" && <AssignmentsTab data={data} persist={persist} addAudit={addAudit} />}
       {tab === "requests" && <RequestsTab data={data} persist={persist} addAudit={addAudit} addNotification={addNotification} />}
       {tab === "maintenance" && <MaintenanceTab data={data} />}
@@ -819,11 +808,10 @@ function AssignmentsTab({ data, persist, addAudit }) {
   );
 }
 
-function IntakeApprovalsTab({ data, persist, addAudit, addNotification }) {
+function IntakeApprovalsTab({ data, persist, addAudit, addNotification, ownerToken }) {
   const pending = data.tenants.filter(t => t.approvalStatus === "pending").sort((a, b) => (a.submittedAt || 0) - (b.submittedAt || 0));
   const reviewed = data.tenants.filter(t => t.approvalStatus === "approved" || t.approvalStatus === "denied").sort((a, b) => (b.reviewedAt || 0) - (a.reviewedAt || 0)).slice(0, 15);
   const [finalTerms, setFinalTerms] = useState({});
-  const [gmailAccessToken, setGmailAccessToken] = useState("");
   const [emailBusyId, setEmailBusyId] = useState(null);
   const setTerm = (id, key, value) => setFinalTerms(previous => ({ ...previous, [id]: { ...(previous[id] || {}), [key]: value } }));
 
@@ -834,26 +822,14 @@ function IntakeApprovalsTab({ data, persist, addAudit, addNotification }) {
     if (!record || record.approvalStatus !== "approved" || !record.application) return;
     setEmailBusyId(recordId);
     try {
-      let token = gmailAccessToken;
-      if (!token) {
-        token = await requestGmailSendToken();
-        const profileResponse = await fetch("https://openidconnect.googleapis.com/v1/userinfo", { headers: { Authorization: `Bearer ${token}` } });
-        const profile = profileResponse.ok ? await profileResponse.json() : {};
-        if ((profile.email || "").toLowerCase() !== GOOGLE_OWNER_EMAIL) {
-          window.google.accounts.oauth2.revoke(token);
-          throw new Error(`Connect Gmail as ${GOOGLE_OWNER_EMAIL} to send approved intake copies.`);
-        }
-        setGmailAccessToken(token);
-      }
       const response = await fetch("/api/approved-intake-copy", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${ownerToken}`, "Content-Type": "application/json" },
         body: JSON.stringify({ recordId, force: Boolean(record.approvalCopyEmailSentAt) }),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
-        if (response.status === 401) setGmailAccessToken("");
-        throw new Error(result.error || "Gmail could not send the intake copy.");
+        throw new Error(result.error || "The intake copy could not be sent.");
       }
       record.approvalCopyEmailStatus = "sent";
       record.approvalCopyEmailSentAt = result.sentAt;
@@ -865,7 +841,7 @@ function IntakeApprovalsTab({ data, persist, addAudit, addNotification }) {
     } catch (failure) {
       record.approvalCopyEmailStatus = "failed";
       await persist(next);
-      window.alert(`The intake approval and archive remain saved. The email copy was not sent. ${failure.message || "Try again after reconnecting Gmail."}`);
+      window.alert(`The intake approval and archive remain saved. The email copy was not sent. ${failure.message || "Try again after reconnecting as Owner."}`);
     } finally {
       setEmailBusyId(null);
     }
@@ -913,7 +889,7 @@ function IntakeApprovalsTab({ data, persist, addAudit, addNotification }) {
 
   return (
     <div>
-      <Panel title="Pending intake applications" subtitle={`Review the full packet and confirm final terms with the participant. Approval archives the full intake in Google Sheets and emails a copy to ${GOOGLE_OWNER_EMAIL}. Google asks for Gmail send permission the first time.`}>
+      <Panel title="Pending intake applications" subtitle={`Review the full packet and confirm final terms with the participant. Approval archives the full intake in Google Sheets and emails a copy to ${GOOGLE_OWNER_EMAIL}.`}>
         {pending.length === 0 ? <EmptyState text="No intake applications are waiting for review." /> : (
           <div style={{ display: "grid", gap: 10 }}>
             {pending.map(applicant => (
