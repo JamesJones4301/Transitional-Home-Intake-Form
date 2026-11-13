@@ -576,7 +576,7 @@ function ParticipantPayments({ data, persist, addAudit }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const set = (key, value) => setForm(current => ({ ...current, [key]: value }));
-  const names = [...new Set((data.tenants || []).map(t => t.name?.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const names = [...new Set((data.tenants || []).filter(t => t.active || t.approvalStatus === "approved").map(t => t.name?.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const entries = [...(data.payments || [])].sort((a, b) => b.paymentDate.localeCompare(a.paymentDate) || b.createdAt - a.createdAt);
   const participants = [...new Set([...names, ...entries.map(entry => entry.participant).filter(Boolean)])].sort((a, b) => a.localeCompare(b));
   const money = value => Number(value || 0).toLocaleString("en-US", { style: "currency", currency: "USD" });
