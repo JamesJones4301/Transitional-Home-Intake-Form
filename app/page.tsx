@@ -46,7 +46,7 @@ function defaultData() {
   const now = Date.now();
   return {
     tenants: [], checkins: [], requests: [],
-    maintenance: [], dailyReports: [], incidentReports: [], staffForms: [], uaTests: [],
+    maintenance: [], dailyReports: [], incidentReports: [], staffForms: [], uaTests: [], payments: [],
     settings: { curfews: { ...DEFAULT_CURFEWS }, managerName: "Program coordinator", managerPhone: "" },
     auditLog: [],
     notifications: [],
@@ -541,8 +541,8 @@ function OvernightPanel({ tenant, data, persist, addAudit, eligibleForOvernight,
 function ManagerView({ data, persist, addAudit, addNotification, readOnly, googleUser, syncStatus, ownerToken }) {
   const [tab, setTab] = useState(readOnly ? "reports" : "today");
   const tabs = readOnly
-    ? [["reports", "Reports"], ["uaTests", "UA test log"]]
-    : [["today", "Today"], ["intakes", "Intake approvals"], ["assignments", "Rooms & beds"], ["requests", "Overnight requests"], ["uaTests", "UA test log"], ["maintenance", "Maintenance"], ["houseReports", "House reports"], ["staffRecords", "Staff records"], ["reports", "Reports"], ["comms", "Notifications"], ["settings", "Settings"]];
+    ? [["reports", "Reports"], ["payments", "Participant payments"], ["uaTests", "UA test log"]]
+    : [["today", "Today"], ["intakes", "Intake approvals"], ["assignments", "Rooms & beds"], ["requests", "Overnight requests"], ["payments", "Participant payments"], ["uaTests", "UA test log"], ["maintenance", "Maintenance"], ["houseReports", "House reports"], ["staffRecords", "Staff records"], ["reports", "Reports"], ["comms", "Notifications"], ["settings", "Settings"]];
 
   return (
     <div>
@@ -559,6 +559,7 @@ function ManagerView({ data, persist, addAudit, addNotification, readOnly, googl
       {tab === "intakes" && <IntakeApprovalsTab data={data} persist={persist} addAudit={addAudit} addNotification={addNotification} ownerToken={ownerToken} />}
       {tab === "assignments" && <AssignmentsTab data={data} persist={persist} addAudit={addAudit} />}
       {tab === "requests" && <RequestsTab data={data} persist={persist} addAudit={addAudit} addNotification={addNotification} />}
+      {tab === "payments" && <ParticipantPayments data={data} persist={persist} addAudit={addAudit} />}
       {tab === "uaTests" && <UATestLog data={data} persist={persist} addAudit={addAudit} />}
       {tab === "maintenance" && <MaintenanceTab data={data} />}
       {tab === "houseReports" && <HouseReportsTab data={data} />}
@@ -568,6 +569,78 @@ function ManagerView({ data, persist, addAudit, addNotification, readOnly, googl
       {tab === "settings" && <SettingsTab data={data} persist={persist} addAudit={addAudit} />}
     </div>
   );
+}
+
+function ParticipantPayments({ data, persist, addAudit }) {
+  const [form, setForm] = useState({ participant: "", paymentType: "", paymentDate: "", amount: "", monthCovered: "", monthPortion: "", moveInDate: "", termsDiscussed: "", discussionDate: "", notes: "" });
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const set = (key, value) => setForm(current => ({ ...current, [key]: value }));
+  const names = [...new Set((data.tenants || []).map(t => t.name?.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const entries = [...(data.payments || [])].sort((a, b) => b.paymentDate.localeCompare(a.paymentDate) || b.createdAt - a.createdAt);
+  const participants = [...new Set([...names, ...entries.map(entry => entry.participant).filter(Boolean)])].sort((a, b) => a.localeCompare(b));
+  const money = value => Number(value || 0).toLocaleString("en-US", { style: "currency", currency: "USD" });
+  const save = async (event) => {
+    event.preventDefault();
+    const participant = form.participant.trim();
+    const amount = Number(form.amount);
+    const monthly = form.paymentType === "Monthly program fee";
+    if (!participant || !["Deposit", "Administrative/application fee", "Monthly program fee"].includes(form.paymentType) || !/^\d{4}-\d{2}-\d{2}$/.test(form.paymentDate) || !/^\d+(\.\d{1,2})?$/.test(form.amount) || !Number.isFinite(amount) || amount <= 0 || (monthly && (!/^\d{4}-\d{2}$/.test(form.monthCovered) || !["Full month", "Half month", "Partial month"].includes(form.monthPortion))) || !["Yes", "No"].includes(form.termsDiscussed)) {
+      setMessage("Complete participant, payment type, date, amount, and discussion status. Monthly fees also need a month and coverage choice.");
+      return;
+    }
+    setBusy(true); setMessage("");
+    const next = JSON.parse(JSON.stringify(data));
+    next.payments = next.payments || [];
+    next.payments.push({ id: uid(), participant, participantId: next.tenants.find(t => t.name?.toLowerCase() === participant.toLowerCase())?.id || "", paymentType: form.paymentType, paymentDate: form.paymentDate, amount, monthCovered: monthly ? form.monthCovered : "", monthPortion: monthly ? form.monthPortion : "", moveInDate: form.moveInDate, termsDiscussed: form.termsDiscussed, discussionDate: form.termsDiscussed === "Yes" ? form.discussionDate : "", notes: form.notes.trim(), createdAt: Date.now() });
+    addAudit(next, GOOGLE_OWNER_EMAIL, "participant_payment_recorded", `${form.paymentType} payment recorded for ${participant} on ${form.paymentDate}.`);
+    const saved = await persist(next);
+    setBusy(false);
+    if (saved) {
+      setForm({ participant: "", paymentType: "", paymentDate: "", amount: "", monthCovered: "", monthPortion: "", moveInDate: "", termsDiscussed: "", discussionDate: "", notes: "" });
+      setMessage("Payment saved to the private Google Sheet.");
+    } else setMessage("Payment did not save. Reconnect as Owner and try again.");
+  };
+  return <div>
+    <Panel title="Record participant payment" subtitle="Record each payment received. Use the notes for payment-plan terms or follow-up.">
+      <form onSubmit={save}>
+        <Field label="Participant name"><input list="payment-participants" value={form.participant} onChange={e => set("participant", e.target.value)} required maxLength={120} autoComplete="off" placeholder="Select or enter participant name" style={input} /></Field>
+        <datalist id="payment-participants">{names.map(name => <option key={name} value={name} />)}</datalist>
+        <div className="two-col-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label="Payment type"><select required value={form.paymentType} onChange={e => set("paymentType", e.target.value)} style={input}><option value="">Select type</option><option>Deposit</option><option>Administrative/application fee</option><option>Monthly program fee</option></select></Field>
+          <Field label="Date paid"><input required type="date" value={form.paymentDate} onChange={e => set("paymentDate", e.target.value)} style={input} /></Field>
+          <Field label="Amount paid ($)"><input required type="number" min="0.01" step="0.01" value={form.amount} onChange={e => set("amount", e.target.value)} style={input} placeholder="0.00" /></Field>
+          <Field label="Move-in date"><input type="date" value={form.moveInDate} onChange={e => set("moveInDate", e.target.value)} style={input} /></Field>
+        </div>
+        {form.paymentType === "Monthly program fee" && <div className="two-col-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label="Month covered"><input required type="month" value={form.monthCovered} onChange={e => set("monthCovered", e.target.value)} style={input} /></Field>
+          <Field label="Month paid"><select required value={form.monthPortion} onChange={e => set("monthPortion", e.target.value)} style={input}><option value="">Select coverage</option><option>Full month</option><option>Half month</option><option>Partial month</option></select></Field>
+        </div>}
+        <div className="two-col-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label="Sat down and discussed terms?"><select required value={form.termsDiscussed} onChange={e => set("termsDiscussed", e.target.value)} style={input}><option value="">Select</option><option>Yes</option><option>No</option></select></Field>
+          {form.termsDiscussed === "Yes" && <Field label="Date discussed"><input type="date" value={form.discussionDate} onChange={e => set("discussionDate", e.target.value)} style={input} /></Field>}
+        </div>
+        <Field label="Notes or payment-plan details"><textarea value={form.notes} onChange={e => set("notes", e.target.value)} maxLength={2000} style={{ ...input, minHeight: 88, resize: "vertical" }} placeholder="Terms discussed, agreed payment dates, and follow-up" /></Field>
+        <button type="submit" disabled={busy} style={busy ? btnDisabled : btnPrimary}>{busy ? "Saving…" : "Save payment"}</button>
+        {message && <p role="status" style={{ fontSize: 13, color: theme.inkSoft }}>{message}</p>}
+      </form>
+    </Panel>
+    <Panel title="Participant payment overview" subtitle="Totals reflect payments recorded here. An empty deposit means no deposit payment has been entered.">
+      {participants.length === 0 ? <EmptyState text="No participants or payments recorded yet." /> : <div style={{ display: "grid", gap: 9 }}>{participants.map(name => {
+        const personal = entries.filter(entry => entry.participant?.toLowerCase() === name.toLowerCase());
+        const total = type => personal.filter(entry => entry.paymentType === type).reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+        const latest = personal[0];
+        return <div key={name} style={{ ...listRow, alignItems: "flex-start", flexDirection: "column", gap: 4 }}><strong>{name}</strong><span style={{ fontSize: 13 }}>Deposit: {personal.some(entry => entry.paymentType === "Deposit") ? money(total("Deposit")) : "No payment recorded"} · Administrative/application fee: {money(total("Administrative/application fee"))} · Monthly fees: {money(total("Monthly program fee"))}</span><span style={{ fontSize: 12, color: theme.inkSoft }}>Move-in: {personal.find(entry => entry.moveInDate)?.moveInDate || "Not recorded here"} · Terms discussed: {personal.find(entry => entry.termsDiscussed === "Yes") ? "Yes" : latest?.termsDiscussed || "Not recorded"}</span></div>;
+      })}</div>}
+    </Panel>
+    <Panel title="Payment history" subtitle="Payments appear by date paid. A full-month label describes the recorded coverage, not an automatic balance calculation.">
+      {entries.length === 0 ? <EmptyState text="No participant payments recorded yet." /> : <div style={{ display: "grid", gap: 10 }}>{entries.map(entry => <details key={entry.id} style={{ ...listRow, display: "block" }}><summary style={{ cursor: "pointer" }}><strong>{entry.participant}</strong> · {entry.paymentType} · {money(entry.amount)} · {entry.paymentDate}</summary><div style={{ marginTop: 9, fontSize: 13, lineHeight: 1.6 }}>
+        {entry.monthCovered && <div>Month covered: {entry.monthCovered} · {entry.monthPortion}</div>}
+        <div>Move-in date: {entry.moveInDate || "Not entered"}</div><div>Terms discussed: {entry.termsDiscussed}{entry.discussionDate ? ` · ${entry.discussionDate}` : ""}</div>
+        {entry.notes && <div style={{ whiteSpace: "pre-wrap" }}>Notes: {entry.notes}</div>}
+      </div></details>)}</div>}
+    </Panel>
+  </div>;
 }
 
 function UATestLog({ data, persist, addAudit }) {
