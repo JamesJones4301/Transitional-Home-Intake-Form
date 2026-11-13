@@ -46,7 +46,7 @@ function defaultData() {
   const now = Date.now();
   return {
     tenants: [], checkins: [], requests: [],
-    maintenance: [], dailyReports: [], incidentReports: [], staffForms: [],
+    maintenance: [], dailyReports: [], incidentReports: [], staffForms: [], uaTests: [],
     settings: { curfews: { ...DEFAULT_CURFEWS }, managerName: "Program coordinator", managerPhone: "" },
     auditLog: [],
     notifications: [],
@@ -541,8 +541,8 @@ function OvernightPanel({ tenant, data, persist, addAudit, eligibleForOvernight,
 function ManagerView({ data, persist, addAudit, addNotification, readOnly, googleUser, syncStatus, ownerToken }) {
   const [tab, setTab] = useState(readOnly ? "reports" : "today");
   const tabs = readOnly
-    ? [["reports", "Reports"]]
-    : [["today", "Today"], ["intakes", "Intake approvals"], ["assignments", "Rooms & beds"], ["requests", "Overnight requests"], ["maintenance", "Maintenance"], ["houseReports", "House reports"], ["staffRecords", "Staff records"], ["reports", "Reports"], ["comms", "Notifications"], ["settings", "Settings"]];
+    ? [["reports", "Reports"], ["uaTests", "UA test log"]]
+    : [["today", "Today"], ["intakes", "Intake approvals"], ["assignments", "Rooms & beds"], ["requests", "Overnight requests"], ["uaTests", "UA test log"], ["maintenance", "Maintenance"], ["houseReports", "House reports"], ["staffRecords", "Staff records"], ["reports", "Reports"], ["comms", "Notifications"], ["settings", "Settings"]];
 
   return (
     <div>
@@ -559,6 +559,7 @@ function ManagerView({ data, persist, addAudit, addNotification, readOnly, googl
       {tab === "intakes" && <IntakeApprovalsTab data={data} persist={persist} addAudit={addAudit} addNotification={addNotification} ownerToken={ownerToken} />}
       {tab === "assignments" && <AssignmentsTab data={data} persist={persist} addAudit={addAudit} />}
       {tab === "requests" && <RequestsTab data={data} persist={persist} addAudit={addAudit} addNotification={addNotification} />}
+      {tab === "uaTests" && <UATestLog data={data} persist={persist} addAudit={addAudit} />}
       {tab === "maintenance" && <MaintenanceTab data={data} />}
       {tab === "houseReports" && <HouseReportsTab data={data} />}
       {tab === "staffRecords" && <StaffRecordsTab data={data} />}
@@ -567,6 +568,56 @@ function ManagerView({ data, persist, addAudit, addNotification, readOnly, googl
       {tab === "settings" && <SettingsTab data={data} persist={persist} addAudit={addAudit} />}
     </div>
   );
+}
+
+function UATestLog({ data, persist, addAudit }) {
+  const [participant, setParticipant] = useState("");
+  const [testDate, setTestDate] = useState("");
+  const [result, setResult] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const names = [...new Set((data.tenants || []).map(t => t.name?.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const records = [...(data.uaTests || [])].sort((a, b) => b.testDate.localeCompare(a.testDate) || b.createdAt - a.createdAt);
+  const save = async (event) => {
+    event.preventDefault();
+    const name = participant.trim();
+    if (!name || !/^\d{4}-\d{2}-\d{2}$/.test(testDate) || !Number.isFinite(new Date(`${testDate}T12:00:00`).getTime()) || !["Negative", "Positive", "Inconclusive", "Pending"].includes(result)) {
+      setMessage("Enter a participant, test date, and result.");
+      return;
+    }
+    setBusy(true);
+    setMessage("");
+    const next = JSON.parse(JSON.stringify(data));
+    next.uaTests = next.uaTests || [];
+    const record = { id: uid(), participant: name, participantId: next.tenants.find(t => t.name?.toLowerCase() === name.toLowerCase())?.id || "", testDate, result, createdAt: Date.now() };
+    next.uaTests.push(record);
+    addAudit(next, GOOGLE_OWNER_EMAIL, "ua_test_recorded", `UA test recorded for ${name} on ${testDate}.`);
+    const saved = await persist(next);
+    setBusy(false);
+    if (saved) {
+      setParticipant(""); setTestDate(""); setResult("");
+      setMessage("UA test saved to the private Google Sheet.");
+    } else {
+      setMessage("The UA test did not save. Reconnect as Owner, then try again.");
+    }
+  };
+  return <div>
+    <Panel title="Record a UA test" subtitle="Enter one test at a time. Results stay in the restricted owner workbook.">
+      <form onSubmit={save}>
+        <Field label="Participant name"><input list="ua-participants" value={participant} onChange={e => setParticipant(e.target.value)} required maxLength={120} autoComplete="off" style={input} placeholder="Select or enter participant name" /></Field>
+        <datalist id="ua-participants">{names.map(name => <option key={name} value={name} />)}</datalist>
+        <div className="two-col-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label="Date of test"><input type="date" value={testDate} onChange={e => setTestDate(e.target.value)} required style={input} /></Field>
+          <Field label="Result"><select value={result} onChange={e => setResult(e.target.value)} required style={input}><option value="">Select result</option><option value="Negative">Negative</option><option value="Positive">Positive</option><option value="Inconclusive">Inconclusive</option><option value="Pending">Pending</option></select></Field>
+        </div>
+        <button type="submit" disabled={busy} style={busy ? btnDisabled : btnPrimary}>{busy ? "Saving…" : "Save UA test"}</button>
+        {message && <p role="status" style={{ fontSize: 13, color: theme.inkSoft }}>{message}</p>}
+      </form>
+    </Panel>
+    <Panel title="UA test history" subtitle="Most recent test dates appear first.">
+      {records.length === 0 ? <EmptyState text="No UA tests recorded yet." /> : <div style={{ display: "grid", gap: 8 }}>{records.map(record => <div key={record.id} style={listRow}><span><strong>{record.participant}</strong><span style={{ display: "block", fontSize: 12, color: theme.inkSoft }}>{record.testDate}</span></span><Badge tone={record.result === "Positive" ? "red" : record.result === "Negative" ? "accent" : "amber"}>{record.result}</Badge></div>)}</div>}
+    </Panel>
+  </div>;
 }
 
 function TodayTab({ data }) {
