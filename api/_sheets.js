@@ -5,7 +5,7 @@ const OWNER_EMAIL = "ashreiimpactfoundation@gmail.com";
 const PACKET_CURFEWS = { 0: "22:00", 1: "22:00", 2: "22:00", 3: "22:00", 4: "22:00", 5: "23:00", 6: "23:00" };
 const EMPTY_STATE = {
   tenants: [], checkins: [], requests: [],
-  maintenance: [], dailyReports: [], incidentReports: [], staffForms: [], uaTests: [], payments: [],
+  maintenance: [], dailyReports: [], incidentReports: [], staffForms: [], uaTests: [], payments: [], monthlyCharges: [],
   settings: { curfews: PACKET_CURFEWS, curfewPolicyVersion: "client-packet-2026-09-28", managerName: "Program coordinator", managerPhone: "" },
   auditLog: [], notifications: [],
 };
@@ -43,6 +43,13 @@ function rows(data) {
     "Staff Forms": (data.staffForms || []).map(r => [r.id, iso(r.createdAt), r.formType || "", r.formLabel || "", r.fields?.participant || "", r.fields?.staffName || "", JSON.stringify(r.fields || {})]),
     "UA Tests": (data.uaTests || []).map(r => [r.id, r.participant || "", r.testDate || "", r.result || "", iso(r.createdAt), r.participantId || ""]),
     "Participant Payments": (data.payments || []).map(r => [r.id, r.participant || "", r.paymentType || "", r.paymentDate || "", r.amount || 0, r.monthCovered || "", r.monthPortion || "", r.moveInDate || "", r.termsDiscussed || "", r.discussionDate || "", r.notes || "", iso(r.createdAt), r.participantId || ""]),
+    "Monthly Balances": (data.monthlyCharges || []).map(r => {
+      const paid = (data.payments || []).filter(p => p.paymentType === "Monthly program fee" && p.monthCovered === r.month && p.participant?.toLowerCase() === r.participant?.toLowerCase()).reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const remaining = Math.max(0, Math.round((Number(r.amountDue || 0) - paid) * 100) / 100);
+      const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+      const today = `${parts.find(part => part.type === "year")?.value}-${parts.find(part => part.type === "month")?.value}-${parts.find(part => part.type === "day")?.value}`;
+      return [r.id, r.participant || "", r.month || "", Number(r.amountDue || 0), paid, remaining, r.dueDate || "", remaining > 0 && r.dueDate < today ? "Overdue" : remaining > 0 ? "Balance due" : "Paid in full", r.notes || "", iso(r.createdAt), iso(r.updatedAt), r.participantId || ""];
+    }),
     "Approved Intake Forms": (data.tenants || []).filter(t => t.approvalStatus === "approved" && t.application).map(t => [t.id, t.name || "", iso(t.submittedAt), iso(t.reviewedAt), t.reviewedBy || "", t.application.packetVersion || "", JSON.stringify({ applicant: t.application.applicant || {}, acknowledgments: t.application.acknowledgments || {}, initials: t.application.initials || {}, signatures: t.application.signatures || {}, signedAt: t.application.signedAt || "", finalTerms: t.application.finalTerms || {}, approvalCopyEmailStatus: t.approvalCopyEmailStatus || "", approvalCopyEmailSentAt: iso(t.approvalCopyEmailSentAt), approvalCopyRecipient: t.approvalCopyRecipient || "" })]),
     "Program Settings": [["Coordinator Name", data.settings?.managerName || ""], ["Coordinator Phone", data.settings?.managerPhone || ""]],
     "Audit Log": data.auditLog.map(a => [a.id, iso(a.timestamp), a.actor || "", a.action || "", a.entityType || "", a.entityId || "", a.detail || ""]),
@@ -79,7 +86,7 @@ export async function writeState(data) {
   const safe = { ...EMPTY_STATE, ...data, settings: { ...EMPTY_STATE.settings, ...(data.settings || {}) } };
   const sheetRows = rows(safe);
   await ensureTabs(client, Object.keys(sheetRows).concat("Portal State"));
-  await client.spreadsheets.values.batchClear({ spreadsheetId: SPREADSHEET_ID, requestBody: { ranges: ["Residents!A2:Q1000", "'Check-Ins'!A2:H1000", "'Overnight Requests'!A2:M1000", "'Daily Reports'!A2:F1000", "'Incident Reports'!A2:F1000", "'Staff Forms'!A2:G2001", "'UA Tests'!A2:F2001", "'Participant Payments'!A2:M2001", "'Approved Intake Forms'!A2:G2001", "'Program Settings'!A2:C1000", "'Audit Log'!A2:G2001", "Notifications!A2:G2001"] } });
+  await client.spreadsheets.values.batchClear({ spreadsheetId: SPREADSHEET_ID, requestBody: { ranges: ["Residents!A2:Q1000", "'Check-Ins'!A2:H1000", "'Overnight Requests'!A2:M1000", "'Daily Reports'!A2:F1000", "'Incident Reports'!A2:F1000", "'Staff Forms'!A2:G2001", "'UA Tests'!A2:F2001", "'Participant Payments'!A2:M2001", "'Monthly Balances'!A2:L2001", "'Approved Intake Forms'!A2:G2001", "'Program Settings'!A2:C1000", "'Audit Log'!A2:G2001", "Notifications!A2:G2001"] } });
   const updates = [
     { range: "'Portal State'!A1", values: [[JSON.stringify(safe)]] },
     { range: "'Daily Reports'!A1:F1", values: [["Record ID", "Submitted At", "Staff Member", "Participants", "Report Summary", "Action Taken"]] },
@@ -87,6 +94,7 @@ export async function writeState(data) {
     { range: "'Staff Forms'!A1:G1", values: [["Record ID", "Submitted At", "Form Type", "Form Name", "Participant", "Staff Member", "Form Details (JSON)"]] },
     { range: "'UA Tests'!A1:F1", values: [["Record ID", "Participant", "Date of Test", "Result", "Recorded At", "Participant ID"]] },
     { range: "'Participant Payments'!A1:M1", values: [["Record ID", "Participant", "Payment Type", "Date Paid", "Amount Paid ($)", "Month Covered", "Full/Half/Partial Month", "Move-in Date", "Terms Discussed", "Discussion Date", "Notes / Payment Plan", "Recorded At", "Participant ID"]] },
+    { range: "'Monthly Balances'!A1:L1", values: [["Record ID", "Participant", "Month Owed", "Amount Owed ($)", "Paid ($)", "Remaining ($)", "Due Date", "Status", "Notes / Payment Plan", "Recorded At", "Updated At", "Participant ID"]] },
     { range: "'Approved Intake Forms'!A1:G1", values: [["Record ID", "Participant", "Submitted At", "Approved At", "Approved By", "Packet Version", "Complete Intake Record (JSON)"]] },
     { range: "'Overnight Requests'!D1", values: [["Stay Location"]] },
     { range: "'Overnight Requests'!K1:M1", values: [["Street Address", "Person Staying With", "Relationship"]] },

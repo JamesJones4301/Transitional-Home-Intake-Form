@@ -46,7 +46,7 @@ function defaultData() {
   const now = Date.now();
   return {
     tenants: [], checkins: [], requests: [],
-    maintenance: [], dailyReports: [], incidentReports: [], staffForms: [], uaTests: [], payments: [],
+    maintenance: [], dailyReports: [], incidentReports: [], staffForms: [], uaTests: [], payments: [], monthlyCharges: [],
     settings: { curfews: { ...DEFAULT_CURFEWS }, managerName: "Program coordinator", managerPhone: "" },
     auditLog: [],
     notifications: [],
@@ -573,13 +573,50 @@ function ManagerView({ data, persist, addAudit, addNotification, readOnly, googl
 
 function ParticipantPayments({ data, persist, addAudit }) {
   const [form, setForm] = useState({ participant: "", paymentType: "", paymentDate: "", amount: "", monthCovered: "", monthPortion: "", moveInDate: "", termsDiscussed: "", discussionDate: "", notes: "" });
+  const [charge, setCharge] = useState({ participant: "", month: "", amountDue: "900", dueDate: "", notes: "" });
   const [busy, setBusy] = useState(false);
+  const [chargeBusy, setChargeBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [chargeMessage, setChargeMessage] = useState("");
   const set = (key, value) => setForm(current => ({ ...current, [key]: value }));
   const names = [...new Set((data.tenants || []).filter(t => t.active || t.approvalStatus === "approved").map(t => t.name?.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const entries = [...(data.payments || [])].sort((a, b) => b.paymentDate.localeCompare(a.paymentDate) || b.createdAt - a.createdAt);
-  const participants = [...new Set([...names, ...entries.map(entry => entry.participant).filter(Boolean)])].sort((a, b) => a.localeCompare(b));
+  const charges = [...(data.monthlyCharges || [])].sort((a, b) => b.month.localeCompare(a.month) || a.participant.localeCompare(b.participant));
+  const participants = [...new Set([...names, ...entries.map(entry => entry.participant).filter(Boolean), ...charges.map(entry => entry.participant).filter(Boolean)])].sort((a, b) => a.localeCompare(b));
   const money = value => Number(value || 0).toLocaleString("en-US", { style: "currency", currency: "USD" });
+  const dateParts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const today = `${dateParts.find(part => part.type === "year")?.value}-${dateParts.find(part => part.type === "month")?.value}-${dateParts.find(part => part.type === "day")?.value}`;
+  const monthLabel = month => new Date(`${month}-01T12:00:00`).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const saveCharge = async event => {
+    event.preventDefault();
+    const participant = charge.participant.trim();
+    const amountDue = Number(charge.amountDue);
+    if (!participant || !/^\d{4}-(0[1-9]|1[0-2])$/.test(charge.month) || !/^\d+(\.\d{1,2})?$/.test(charge.amountDue) || !Number.isFinite(amountDue) || amountDue <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(charge.dueDate)) {
+      setChargeMessage("Enter a participant, month, amount owed, and due date."); return;
+    }
+    if (charge.dueDate.slice(0, 7) !== charge.month) { setChargeMessage("The due date must fall within the selected month."); return; }
+    if (charges.some(row => row.participant.toLowerCase() === participant.toLowerCase() && row.month === charge.month)) { setChargeMessage("This participant already has an amount due for this month. Edit that record below if the amount changed."); return; }
+    setChargeBusy(true); setChargeMessage("");
+    const next = JSON.parse(JSON.stringify(data));
+    next.monthlyCharges = next.monthlyCharges || [];
+    next.monthlyCharges.push({ id: uid(), participant, participantId: next.tenants.find(t => t.name?.toLowerCase() === participant.toLowerCase())?.id || "", month: charge.month, amountDue, dueDate: charge.dueDate, notes: charge.notes.trim(), createdAt: Date.now() });
+    addAudit(next, GOOGLE_OWNER_EMAIL, "monthly_balance_created", `Amount due recorded for ${participant}, ${charge.month}: ${money(amountDue)}.`);
+    const saved = await persist(next);
+    setChargeBusy(false);
+    if (saved) { setCharge({ participant: "", month: "", amountDue: "900", dueDate: "", notes: "" }); setChargeMessage("Monthly amount due saved."); }
+    else setChargeMessage("Amount due did not save. Reconnect as Owner and try again.");
+  };
+  const updateCharge = async (row, amountText, dueDate, notes) => {
+    const amountDue = Number(amountText);
+    if (!/^\d+(\.\d{1,2})?$/.test(amountText) || amountDue <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate) || dueDate.slice(0, 7) !== row.month) { setChargeMessage("Enter a positive amount and a due date within this month."); return false; }
+    setChargeBusy(true); setChargeMessage("");
+    const next = JSON.parse(JSON.stringify(data));
+    next.monthlyCharges = next.monthlyCharges.map(item => item.id === row.id ? { ...item, amountDue, dueDate, notes: notes.trim(), updatedAt: Date.now() } : item);
+    addAudit(next, GOOGLE_OWNER_EMAIL, "monthly_balance_updated", `Amount due updated for ${row.participant}, ${row.month}: ${money(amountDue)}.`);
+    const saved = await persist(next);
+    setChargeBusy(false); setChargeMessage(saved ? "Monthly amount due updated." : "Change did not save. Reconnect as Owner and try again.");
+    return saved;
+  };
   const save = async (event) => {
     event.preventDefault();
     const participant = form.participant.trim();
@@ -602,7 +639,20 @@ function ParticipantPayments({ data, persist, addAudit }) {
     } else setMessage("Payment did not save. Reconnect as Owner and try again.");
   };
   return <div>
-    <Panel title="Record participant payment" subtitle="Record each payment received. Use the notes for payment-plan terms or follow-up.">
+    <Panel title="Set monthly amount owed" subtitle="Create one amount due for each participant and month. Enter a partial-month amount when appropriate. The due date controls the overdue label.">
+      <form onSubmit={saveCharge}>
+        <Field label="Participant name"><input list="payment-participants" required maxLength={120} value={charge.participant} onChange={e => setCharge(current => ({ ...current, participant: e.target.value }))} style={input} placeholder="Select or enter participant name" /></Field>
+        <div className="two-col-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label="Month owed"><input required type="month" value={charge.month} onChange={e => setCharge(current => ({ ...current, month: e.target.value, dueDate: e.target.value ? `${e.target.value}-01` : "" }))} style={input} /></Field>
+          <Field label="Amount owed ($)"><input required type="number" min="0.01" step="0.01" value={charge.amountDue} onChange={e => setCharge(current => ({ ...current, amountDue: e.target.value }))} style={input} /></Field>
+          <Field label="Due date"><input required type="date" value={charge.dueDate} onChange={e => setCharge(current => ({ ...current, dueDate: e.target.value }))} style={input} /></Field>
+        </div>
+        <Field label="Notes or payment plan"><textarea maxLength={2000} value={charge.notes} onChange={e => setCharge(current => ({ ...current, notes: e.target.value }))} style={{ ...input, minHeight: 76, resize: "vertical" }} placeholder="Written agreement, next installment date, and follow-up" /></Field>
+        <button type="submit" disabled={chargeBusy} style={chargeBusy ? btnDisabled : btnPrimary}>{chargeBusy ? "Saving…" : "Save amount owed"}</button>
+        {chargeMessage && <p role="status" style={{ fontSize: 13, color: theme.inkSoft }}>{chargeMessage}</p>}
+      </form>
+    </Panel>
+    <Panel title="Record participant payment" subtitle="Record each payment received, including multiple partial payments toward the same month. Use the same participant name and month as the amount owed.">
       <form onSubmit={save}>
         <Field label="Participant name"><input list="payment-participants" value={form.participant} onChange={e => set("participant", e.target.value)} required maxLength={120} autoComplete="off" placeholder="Select or enter participant name" style={input} /></Field>
         <datalist id="payment-participants">{names.map(name => <option key={name} value={name} />)}</datalist>
@@ -625,6 +675,14 @@ function ParticipantPayments({ data, persist, addAudit }) {
         {message && <p role="status" style={{ fontSize: 13, color: theme.inkSoft }}>{message}</p>}
       </form>
     </Panel>
+    <Panel title="Monthly balances" subtitle="Remaining balance equals amount owed minus all monthly payments recorded for the same participant and month. Deposits and application fees stay separate. Overdue means the due date passed with a balance outstanding. Late fees are not added automatically.">
+      {charges.length === 0 ? <EmptyState text="No monthly amounts owed recorded yet. Add a participant and month above to begin tracking balances." /> : <div style={{ display: "grid", gap: 10 }}>{charges.map(row => {
+        const paid = entries.filter(entry => entry.paymentType === "Monthly program fee" && entry.monthCovered === row.month && entry.participant?.toLowerCase() === row.participant.toLowerCase()).reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+        const remaining = Math.max(0, Math.round((Number(row.amountDue) - paid) * 100) / 100);
+        const overdue = remaining > 0 && row.dueDate < today;
+        return <MonthlyBalanceRow key={row.id} row={row} paid={paid} remaining={remaining} overdue={overdue} money={money} monthLabel={monthLabel} updateCharge={updateCharge} chargeBusy={chargeBusy} />;
+      })}</div>}
+    </Panel>
     <Panel title="Participant payment overview" subtitle="Totals reflect payments recorded here. An empty deposit means no deposit payment has been entered.">
       {participants.length === 0 ? <EmptyState text="No participants or payments recorded yet." /> : <div style={{ display: "grid", gap: 9 }}>{participants.map(name => {
         const personal = entries.filter(entry => entry.participant?.toLowerCase() === name.toLowerCase());
@@ -640,6 +698,24 @@ function ParticipantPayments({ data, persist, addAudit }) {
         {entry.notes && <div style={{ whiteSpace: "pre-wrap" }}>Notes: {entry.notes}</div>}
       </div></details>)}</div>}
     </Panel>
+  </div>;
+}
+
+function MonthlyBalanceRow({ row, paid, remaining, overdue, money, monthLabel, updateCharge, chargeBusy }) {
+  const [editing, setEditing] = useState(false);
+  const [amount, setAmount] = useState(String(row.amountDue));
+  const [dueDate, setDueDate] = useState(row.dueDate);
+  const [notes, setNotes] = useState(row.notes || "");
+  return <div style={{ ...listRow, display: "block", lineHeight: 1.6 }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}><strong>{row.participant} · {monthLabel(row.month)}</strong><Badge tone={overdue ? "red" : remaining ? "amber" : "accent"}>{overdue ? "Overdue" : remaining ? "Balance due" : "Paid in full"}</Badge></div>
+    <div style={{ fontSize: 13 }}>Owed: {money(row.amountDue)} · Paid: {money(paid)} · Remaining: <strong>{money(remaining)}</strong>{paid > Number(row.amountDue) ? ` · Overpaid: ${money(paid - Number(row.amountDue))}` : ""}</div>
+    <div style={{ fontSize: 12, color: theme.inkSoft }}>Due: {row.dueDate}</div>
+    {row.notes && !editing && <div style={{ fontSize: 13, whiteSpace: "pre-wrap" }}>Notes / plan: {row.notes}</div>}
+    {!editing ? <button type="button" onClick={() => setEditing(true)} style={{ ...tabInactive, marginTop: 8 }}>Edit amount or plan</button> : <form onSubmit={async event => { event.preventDefault(); if (await updateCharge(row, amount, dueDate, notes)) setEditing(false); }} style={{ marginTop: 10 }}>
+      <div className="two-col-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}><Field label="Amount owed ($)"><input required type="number" min="0.01" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} style={input} /></Field><Field label="Due date"><input required type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} style={input} /></Field></div>
+      <Field label="Notes or payment plan"><textarea maxLength={2000} value={notes} onChange={e => setNotes(e.target.value)} style={{ ...input, minHeight: 72, resize: "vertical" }} /></Field>
+      <button disabled={chargeBusy} type="submit" style={chargeBusy ? btnDisabled : btnPrimary}>Save changes</button> <button type="button" onClick={() => setEditing(false)} style={tabInactive}>Cancel</button>
+    </form>}
   </div>;
 }
 
