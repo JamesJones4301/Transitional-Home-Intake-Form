@@ -31,7 +31,7 @@ const ACKNOWLEDGMENT_QUESTIONS = {
   medication: "I understand the medication self-management and safety policy.",
   curfew: "I will follow the posted curfew, sign-in/sign-out, and overnight-pass procedures, or obtain a documented exception.",
   visitors: "I will follow visitor limits and inform my visitors of the applicable rules.",
-  accountability: "I reviewed the three-level accountability, discharge, transition, and lawful-possession policy.",
+  accountability: "I reviewed the three-level accountability, discharge, transition, and lawful-possession policy. For any listed violation, the owner may elect to end my program participation at any point, including after a first violation, based on the circumstances and the need to protect other participants. The owner will document the facts and decision. No set number of warnings is required before a program decision. Ending program participation does not itself authorize removal from an occupied space; applicable notice and possession procedures still apply.",
   property: "I reviewed the property retrieval and abandoned-property policy.", rights: "I reviewed my rights and the grievance or appeal process.",
   hygiene: "I understand the move-in laundry and shower procedure.",
   documents: "I reviewed all sections in this online form and certify the information I entered is accurate.",
