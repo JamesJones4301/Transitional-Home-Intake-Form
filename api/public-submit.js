@@ -4,7 +4,7 @@ import { failureDetails, sendFailureAlert } from "./_intake-failure-alert.js";
 
 const id = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 const clean = value => String(value || "").trim();
-const PACKET_VERSION = "Client View, September 28, 2026 (SL.19-SL.32); entry testing and curfew addendum, November 2026 v2";
+const PACKET_VERSION = "Client View, September 28, 2026 (SL.19-SL.32); entry testing and curfew addendum, November 2026 v3";
 const INITIAL_SECTIONS = ["agreement", "termination", "rules", "schedule", "medication", "entryTesting", "curfew", "curfewAbsence", "accountability", "property", "rights"];
 const SIGNATURE_SECTIONS = ["application", "agreement", "fee", "faith", "testing", "release", "receipt"];
 const REQUIRED_ACKS = ["sobriety", "houseRules", "communitySafety", "respect", "feeTerms", "testing", "medication", "curfew", "visitors", "accountability", "property", "rights", "documents", "hygiene", "backgroundCheck", "electronicSignature"];
