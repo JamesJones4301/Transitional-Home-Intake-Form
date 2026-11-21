@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 
-const PACKET_VERSION = "Client View, September 28, 2026 (SL.19-SL.32); entry testing and curfew addendum, November 2026 v2";
+const PACKET_VERSION = "Client View, September 28, 2026 (SL.19-SL.32); entry testing and curfew addendum, November 2026 v3";
 const INITIAL_SECTIONS = ["agreement", "termination", "rules", "schedule", "medication", "entryTesting", "curfew", "curfewAbsence", "accountability", "property", "rights"];
 const SIGNATURE_SECTIONS = ["application", "agreement", "fee", "faith", "testing", "release", "receipt"];
 const REQUIRED_ACKS = ["sobriety", "houseRules", "communitySafety", "respect", "feeTerms", "testing", "medication", "curfew", "visitors", "accountability", "property", "rights", "documents", "hygiene", "backgroundCheck", "electronicSignature"];
@@ -208,6 +208,7 @@ export default function IntakeForm({ onDone }: { onDone: () => void }) {
         <p><strong>Level 1:</strong> routine curfew, chores, meeting, sign-in, visitor, or quiet-hour violations. Coaching, written action, final warning, and termination may follow. Three documented Level 1 violations in 60 days are a guideline, not a guaranteed number of warnings.</p>
         <p><strong>Level 2:</strong> serious substance use or possession, testing refusal or tampering, theft, major damage, serious dishonesty, prohibited items, unauthorized overnight guests, or substantial disruption. A final warning or immediate program termination may follow.</p>
         <p><strong>Level 3:</strong> violence, credible threats, weapons, drug distribution, supplying substances to another participant, arson, serious criminal conduct, or immediate danger. Staff may take lawful immediate safety steps and contact emergency services.</p>
+        <p><strong>Owner decision:</strong> For any violation listed above, the owner may elect to end a participant's program participation at any point, including after a first violation, based on the circumstances and the need to protect other participants. The owner will document the facts and decision. No set number of warnings is required before a program decision.</p>
         <p>Leadership documents facts, prior incidents, safety, corrective efforts, the decision-maker, transition, and occupancy status. An authorized Ashrei representative issues formal termination and possession notices. Program termination does not itself authorize removal from an occupied space. Staff will follow applicable notice and possession processes and may offer safe transition resources.</p>
         {check("accountability", "I reviewed the three-level accountability, discharge, transition, and lawful-possession policy.")}{initial("accountability", "Accountability and discharge policy")}
       </Section>
