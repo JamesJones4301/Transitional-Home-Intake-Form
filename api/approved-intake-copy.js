@@ -41,6 +41,7 @@ const ACKNOWLEDGMENT_QUESTIONS = {
 const INITIAL_QUESTIONS = {
   agreement: "Agreement and program terms initials", termination: "Termination and possession terms initials", rules: "House rules and community standards initials",
   schedule: "Weekly schedule initials", medication: "Medication policy initials", curfew: "Curfew and overnight policy initials",
+  curfewAbsence: "Curfew, unapproved absence, storage, and 60-day return policy initials. If I stay out past curfew without approval, leave the property for one day or more without communicating with Ashrei or receiving approval, or receive a curfew violation, Ashrei may document the violation and consider corrective action or termination under the accountability policy. If Ashrei terminates my program participation for these reasons, I understand I will not be eligible to return to the program for 60 days. Program termination does not immediately end any legal right to occupy or authorize a lockout. Ashrei will follow applicable notice and possession procedures. After I lawfully leave or my right to possession ends, Ashrei will document and handle any belongings left behind under applicable law, including boxing or storage when appropriate and arranging lawful retrieval. Ashrei will not remove my belongings or deny access solely because a violation report was entered.",
   accountability: "Accountability and discharge policy initials", property: "Property policy initials", rights: "Rights and grievance policy initials",
 };
 const SIGNATURE_QUESTIONS = {
