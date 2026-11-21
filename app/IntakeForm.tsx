@@ -2,8 +2,8 @@
 
 import React, { useState } from "react";
 
-const PACKET_VERSION = "Client View, September 28, 2026 (SL.19-SL.32)";
-const INITIAL_SECTIONS = ["agreement", "termination", "rules", "schedule", "medication", "curfew", "accountability", "property", "rights"];
+const PACKET_VERSION = "Client View, September 28, 2026 (SL.19-SL.32); curfew and absence addendum, November 2026";
+const INITIAL_SECTIONS = ["agreement", "termination", "rules", "schedule", "medication", "curfew", "curfewAbsence", "accountability", "property", "rights"];
 const SIGNATURE_SECTIONS = ["application", "agreement", "fee", "faith", "testing", "release", "receipt"];
 const REQUIRED_ACKS = ["sobriety", "houseRules", "communitySafety", "respect", "feeTerms", "testing", "medication", "curfew", "visitors", "accountability", "property", "rights", "documents", "hygiene", "backgroundCheck", "electronicSignature"];
 
@@ -166,6 +166,12 @@ export default function IntakeForm({ onDone }: { onDone: () => void }) {
         <p>Sign in and out. Request overnight approval before leaving. Visitors are limited to approved hours and common areas. Bedrooms and sleeping areas are off-limits. No overnight guests without a written exception. Ashrei may end unsafe or disruptive visits.</p>
         {check("curfew", "I will follow the posted curfew, sign-in/sign-out, and overnight-pass procedures, or obtain a documented exception.")}
         {check("visitors", "I will follow visitor limits and inform my visitors of the applicable rules.")}{initial("curfew", "Curfew and overnight policy")}
+        <div className="packet-fieldset" style={{ marginTop: 16 }}>
+          <strong>Curfew, unapproved absence, and return policy. Initial separately.</strong>
+          <p>If I stay out past curfew without approval, leave the property for one day or more without communicating with Ashrei or receiving approval, or receive a curfew violation, Ashrei may document the violation and consider corrective action or termination under the accountability policy. If Ashrei terminates my program participation for these reasons, I understand I will not be eligible to return to the program for 60 days.</p>
+          <p>Program termination does not immediately end any legal right to occupy or authorize a lockout. Ashrei will follow applicable notice and possession procedures. After I lawfully leave or my right to possession ends, Ashrei will document and handle any belongings left behind under applicable law, including boxing or storage when appropriate and arranging lawful retrieval. Ashrei will not remove my belongings or deny access solely because a violation report was entered.</p>
+          {initial("curfewAbsence", "Curfew, unapproved absence, storage, and 60-day return policy")}
+        </div>
       </Section>
 
       <Section title="10. Weekly program schedule" note="The posted schedule may change. Random testing may occur at any time. Staff will document approved exceptions.">

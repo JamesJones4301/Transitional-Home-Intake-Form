@@ -46,7 +46,7 @@ function defaultData() {
   const now = Date.now();
   return {
     tenants: [], checkins: [], requests: [],
-    maintenance: [], dailyReports: [], incidentReports: [], staffForms: [], uaTests: [], payments: [], monthlyCharges: [],
+    maintenance: [], dailyReports: [], incidentReports: [], staffForms: [], uaTests: [], payments: [], monthlyCharges: [], ownerWriteUps: [],
     settings: { curfews: { ...DEFAULT_CURFEWS }, managerName: "Program coordinator", managerPhone: "" },
     auditLog: [],
     notifications: [],
@@ -541,8 +541,8 @@ function OvernightPanel({ tenant, data, persist, addAudit, eligibleForOvernight,
 function ManagerView({ data, persist, addAudit, addNotification, readOnly, googleUser, syncStatus, ownerToken }) {
   const [tab, setTab] = useState(readOnly ? "reports" : "today");
   const tabs = readOnly
-    ? [["reports", "Reports"], ["payments", "Participant payments"], ["uaTests", "UA test log"]]
-    : [["today", "Today"], ["intakes", "Intake approvals"], ["assignments", "Rooms & beds"], ["requests", "Overnight requests"], ["payments", "Participant payments"], ["uaTests", "UA test log"], ["maintenance", "Maintenance"], ["houseReports", "House reports"], ["staffRecords", "Staff records"], ["reports", "Reports"], ["comms", "Notifications"], ["settings", "Settings"]];
+    ? [["reports", "Reports"], ["payments", "Participant payments"], ["uaTests", "UA test log"], ["writeUps", "Owner write-ups"]]
+    : [["today", "Today"], ["intakes", "Intake approvals"], ["assignments", "Rooms & beds"], ["requests", "Overnight requests"], ["payments", "Participant payments"], ["uaTests", "UA test log"], ["writeUps", "Owner write-ups"], ["maintenance", "Maintenance"], ["houseReports", "House reports"], ["staffRecords", "Staff records"], ["reports", "Reports"], ["comms", "Notifications"], ["settings", "Settings"]];
 
   return (
     <div>
@@ -561,6 +561,7 @@ function ManagerView({ data, persist, addAudit, addNotification, readOnly, googl
       {tab === "requests" && <RequestsTab data={data} persist={persist} addAudit={addAudit} addNotification={addNotification} />}
       {tab === "payments" && <ParticipantPayments data={data} persist={persist} addAudit={addAudit} />}
       {tab === "uaTests" && <UATestLog data={data} persist={persist} addAudit={addAudit} />}
+      {tab === "writeUps" && <OwnerWriteUps data={data} persist={persist} addAudit={addAudit} />}
       {tab === "maintenance" && <MaintenanceTab data={data} />}
       {tab === "houseReports" && <HouseReportsTab data={data} />}
       {tab === "staffRecords" && <StaffRecordsTab data={data} />}
@@ -569,6 +570,45 @@ function ManagerView({ data, persist, addAudit, addNotification, readOnly, googl
       {tab === "settings" && <SettingsTab data={data} persist={persist} addAudit={addAudit} />}
     </div>
   );
+}
+
+function OwnerWriteUps({ data, persist, addAudit }) {
+  const [form, setForm] = useState({ participant: "", incidentDate: "", offense: "", consequence: "", notes: "" });
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+  const names = [...new Set((data.tenants || []).filter(t => t.active || t.approvalStatus === "approved").map(t => t.name?.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const records = [...(data.ownerWriteUps || [])].sort((a, b) => b.incidentDate.localeCompare(a.incidentDate) || b.createdAt - a.createdAt);
+  const save = async event => {
+    event.preventDefault();
+    const participant = form.participant.trim(), offense = form.offense.trim(), consequence = form.consequence.trim();
+    if (!participant || !/^\d{4}-\d{2}-\d{2}$/.test(form.incidentDate) || !offense || !consequence) { setStatus("Enter the participant, date, offense or violation, and consequence."); return; }
+    setBusy(true); setStatus("");
+    const next = JSON.parse(JSON.stringify(data));
+    next.ownerWriteUps = next.ownerWriteUps || [];
+    next.ownerWriteUps.unshift({ id: uid(), participant, participantId: next.tenants.find(t => t.name?.toLowerCase() === participant.toLowerCase())?.id || "", incidentDate: form.incidentDate, offense, consequence, notes: form.notes.trim(), recordedBy: GOOGLE_OWNER_EMAIL, createdAt: Date.now() });
+    addAudit(next, GOOGLE_OWNER_EMAIL, "owner_write_up_recorded", `Owner write-up recorded for ${participant} on ${form.incidentDate}.`);
+    const saved = await persist(next);
+    setBusy(false);
+    if (saved) { setForm({ participant: "", incidentDate: "", offense: "", consequence: "", notes: "" }); setStatus("Write-up saved to the private workbook."); }
+    else setStatus("Write-up did not save. Reconnect as Owner and try again.");
+  };
+  return <div>
+    <Panel title="Owner participant write-up" subtitle="Record the facts and the action you decided. Saving a report does not itself give notice, terminate occupancy, or restrict access to the residence.">
+      <form onSubmit={save}>
+        <Field label="Participant name"><input list="owner-write-up-participants" required maxLength={120} value={form.participant} onChange={e => setForm(current => ({ ...current, participant: e.target.value }))} style={input} placeholder="Select or enter participant name" /></Field>
+        <datalist id="owner-write-up-participants">{names.map(name => <option key={name} value={name} />)}</datalist>
+        <Field label="Date of offense or violation"><input required type="date" value={form.incidentDate} onChange={e => setForm(current => ({ ...current, incidentDate: e.target.value }))} style={input} /></Field>
+        <Field label="Offense or violation"><textarea required maxLength={4000} value={form.offense} onChange={e => setForm(current => ({ ...current, offense: e.target.value }))} style={{ ...input, minHeight: 100, resize: "vertical" }} placeholder="Describe what happened, when, and the applicable rule" /></Field>
+        <Field label="Consequence or corrective action"><textarea required maxLength={4000} value={form.consequence} onChange={e => setForm(current => ({ ...current, consequence: e.target.value }))} style={{ ...input, minHeight: 90, resize: "vertical" }} placeholder="Record the decision and any follow-up date" /></Field>
+        <Field label="Additional notes"><textarea maxLength={4000} value={form.notes} onChange={e => setForm(current => ({ ...current, notes: e.target.value }))} style={{ ...input, minHeight: 76, resize: "vertical" }} placeholder="Conversation, witness, prior warning, or next step" /></Field>
+        <button type="submit" disabled={busy} style={busy ? btnDisabled : btnPrimary}>{busy ? "Saving…" : "Save write-up"}</button>
+        {status && <p role="status" style={{ fontSize: 13, color: theme.inkSoft }}>{status}</p>}
+      </form>
+    </Panel>
+    <Panel title="Owner write-up history" subtitle="Private records entered by the verified owner account.">
+      {records.length === 0 ? <EmptyState text="No owner write-ups recorded yet." /> : <div style={{ display: "grid", gap: 10 }}>{records.map(record => <details key={record.id} style={{ ...listRow, display: "block" }}><summary style={{ cursor: "pointer" }}><strong>{record.participant}</strong> · {record.incidentDate}</summary><div style={{ marginTop: 9, fontSize: 13, whiteSpace: "pre-wrap", lineHeight: 1.6 }}><div><strong>Offense or violation:</strong> {record.offense}</div><div><strong>Consequence:</strong> {record.consequence}</div>{record.notes && <div><strong>Notes:</strong> {record.notes}</div>}<div style={{ color: theme.inkSoft }}>Recorded by: {record.recordedBy} · {fmtTime(record.createdAt)}</div></div></details>)}</div>}
+    </Panel>
+  </div>;
 }
 
 function ParticipantPayments({ data, persist, addAudit }) {

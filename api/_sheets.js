@@ -5,7 +5,7 @@ const OWNER_EMAIL = "ashreiimpactfoundation@gmail.com";
 const PACKET_CURFEWS = { 0: "22:00", 1: "22:00", 2: "22:00", 3: "22:00", 4: "22:00", 5: "23:00", 6: "23:00" };
 const EMPTY_STATE = {
   tenants: [], checkins: [], requests: [],
-  maintenance: [], dailyReports: [], incidentReports: [], staffForms: [], uaTests: [], payments: [], monthlyCharges: [],
+  maintenance: [], dailyReports: [], incidentReports: [], staffForms: [], uaTests: [], payments: [], monthlyCharges: [], ownerWriteUps: [],
   settings: { curfews: PACKET_CURFEWS, curfewPolicyVersion: "client-packet-2026-09-28", managerName: "Program coordinator", managerPhone: "" },
   auditLog: [], notifications: [],
 };
@@ -40,6 +40,7 @@ function rows(data) {
     "Overnight Requests": data.requests.map(r => [r.id, r.tenantId, data.tenants.find(t => t.id === r.tenantId)?.name || "", r.destination || "", r.requestedDate || "", r.returnDate || "", r.reason || "", r.status, r.decidedBy || "", iso(r.decidedAt), r.address || "", r.hostName || "", r.hostRelationship || ""]),
     "Daily Reports": (data.dailyReports || []).map(r => [r.id, iso(r.createdAt), r.managerName || "", r.residents || "", r.summary || "", r.actionTaken || ""]),
     "Incident Reports": (data.incidentReports || []).map(r => [r.id, iso(r.createdAt), r.managerName || "", r.residents || "", r.summary || "", r.actionTaken || ""]),
+    "Owner Write-Ups": (data.ownerWriteUps || []).map(r => [r.id, r.participant || "", r.incidentDate || "", r.offense || "", r.consequence || "", r.notes || "", r.recordedBy || "", iso(r.createdAt), r.participantId || ""]),
     "Staff Forms": (data.staffForms || []).map(r => [r.id, iso(r.createdAt), r.formType || "", r.formLabel || "", r.fields?.participant || "", r.fields?.staffName || "", JSON.stringify(r.fields || {})]),
     "UA Tests": (data.uaTests || []).map(r => [r.id, r.participant || "", r.testDate || "", r.result || "", iso(r.createdAt), r.participantId || ""]),
     "Participant Payments": (data.payments || []).map(r => [r.id, r.participant || "", r.paymentType || "", r.paymentDate || "", r.amount || 0, r.monthCovered || "", r.monthPortion || "", r.moveInDate || "", r.termsDiscussed || "", r.discussionDate || "", r.notes || "", iso(r.createdAt), r.participantId || ""]),
@@ -86,11 +87,12 @@ export async function writeState(data) {
   const safe = { ...EMPTY_STATE, ...data, settings: { ...EMPTY_STATE.settings, ...(data.settings || {}) } };
   const sheetRows = rows(safe);
   await ensureTabs(client, Object.keys(sheetRows).concat("Portal State"));
-  await client.spreadsheets.values.batchClear({ spreadsheetId: SPREADSHEET_ID, requestBody: { ranges: ["Residents!A2:Q1000", "'Check-Ins'!A2:H1000", "'Overnight Requests'!A2:M1000", "'Daily Reports'!A2:F1000", "'Incident Reports'!A2:F1000", "'Staff Forms'!A2:G2001", "'UA Tests'!A2:F2001", "'Participant Payments'!A2:M2001", "'Monthly Balances'!A2:L2001", "'Approved Intake Forms'!A2:G2001", "'Program Settings'!A2:C1000", "'Audit Log'!A2:G2001", "Notifications!A2:G2001"] } });
+  await client.spreadsheets.values.batchClear({ spreadsheetId: SPREADSHEET_ID, requestBody: { ranges: ["Residents!A2:Q1000", "'Check-Ins'!A2:H1000", "'Overnight Requests'!A2:M1000", "'Daily Reports'!A2:F1000", "'Incident Reports'!A2:F1000", "'Owner Write-Ups'!A2:I2001", "'Staff Forms'!A2:G2001", "'UA Tests'!A2:F2001", "'Participant Payments'!A2:M2001", "'Monthly Balances'!A2:L2001", "'Approved Intake Forms'!A2:G2001", "'Program Settings'!A2:C1000", "'Audit Log'!A2:G2001", "Notifications!A2:G2001"] } });
   const updates = [
     { range: "'Portal State'!A1", values: [[JSON.stringify(safe)]] },
     { range: "'Daily Reports'!A1:F1", values: [["Record ID", "Submitted At", "Staff Member", "Participants", "Report Summary", "Action Taken"]] },
     { range: "'Incident Reports'!A1:F1", values: [["Record ID", "Submitted At", "Staff Member", "Participants", "Incident Summary", "Action Taken"]] },
+    { range: "'Owner Write-Ups'!A1:I1", values: [["Record ID", "Participant", "Date of Offense", "Offense or Violation", "Consequence", "Additional Notes", "Recorded By", "Recorded At", "Participant ID"]] },
     { range: "'Staff Forms'!A1:G1", values: [["Record ID", "Submitted At", "Form Type", "Form Name", "Participant", "Staff Member", "Form Details (JSON)"]] },
     { range: "'UA Tests'!A1:F1", values: [["Record ID", "Participant", "Date of Test", "Result", "Recorded At", "Participant ID"]] },
     { range: "'Participant Payments'!A1:M1", values: [["Record ID", "Participant", "Payment Type", "Date Paid", "Amount Paid ($)", "Month Covered", "Full/Half/Partial Month", "Move-in Date", "Terms Discussed", "Discussion Date", "Notes / Payment Plan", "Recorded At", "Participant ID"]] },
