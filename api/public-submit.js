@@ -4,8 +4,8 @@ import { failureDetails, sendFailureAlert } from "./_intake-failure-alert.js";
 
 const id = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 const clean = value => String(value || "").trim();
-const PACKET_VERSION = "Client View, September 28, 2026 (SL.19-SL.32)";
-const INITIAL_SECTIONS = ["agreement", "termination", "rules", "schedule", "medication", "curfew", "accountability", "property", "rights"];
+const PACKET_VERSION = "Client View, September 28, 2026 (SL.19-SL.32); curfew and absence addendum, November 2026";
+const INITIAL_SECTIONS = ["agreement", "termination", "rules", "schedule", "medication", "curfew", "curfewAbsence", "accountability", "property", "rights"];
 const SIGNATURE_SECTIONS = ["application", "agreement", "fee", "faith", "testing", "release", "receipt"];
 const REQUIRED_ACKS = ["sobriety", "houseRules", "communitySafety", "respect", "feeTerms", "testing", "medication", "curfew", "visitors", "accountability", "property", "rights", "documents", "hygiene", "backgroundCheck", "electronicSignature"];
 const APPLICANT_FIELDS = ["name", "preferredName", "birthDate", "adult", "phone", "email", "currentAddress", "referralSource", "recoveryStatus", "recoveryOther", "sobrietyDate", "priorSubstances", "treatmentSupports", "legalStatus", "legalOther", "legalContact", "independentLiving", "registryRequirement", "concerns", "medicationStatus", "medications", "faithParticipation", "faithBackground", "goalOneYear", "goalFiveYears", "goalTenYears", "emergencyName", "emergencyRelationship", "emergencyPhone", "emergencyEmail", "secondaryName", "secondaryPhone", "emergencyPermission", "releaseAuthorized", "releasePerson", "releaseInformation", "releasePurpose", "releaseExpiration", "releaseOther", "releaseSignatureDate", "paymentSource", "paymentOther", "canPayAtMoveIn", "nextStep", "preferredMoveIn", "room", "bed", "monthlyRate", "paymentFrequency"];
