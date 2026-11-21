@@ -2,8 +2,8 @@
 
 import React, { useState } from "react";
 
-const PACKET_VERSION = "Client View, September 28, 2026 (SL.19-SL.32); curfew and absence addendum, November 2026";
-const INITIAL_SECTIONS = ["agreement", "termination", "rules", "schedule", "medication", "curfew", "curfewAbsence", "accountability", "property", "rights"];
+const PACKET_VERSION = "Client View, September 28, 2026 (SL.19-SL.32); entry testing and curfew addendum, November 2026 v2";
+const INITIAL_SECTIONS = ["agreement", "termination", "rules", "schedule", "medication", "entryTesting", "curfew", "curfewAbsence", "accountability", "property", "rights"];
 const SIGNATURE_SECTIONS = ["application", "agreement", "fee", "faith", "testing", "release", "receipt"];
 const REQUIRED_ACKS = ["sobriety", "houseRules", "communitySafety", "respect", "feeTerms", "testing", "medication", "curfew", "visitors", "accountability", "property", "rights", "documents", "hygiene", "backgroundCheck", "electronicSignature"];
 
@@ -151,7 +151,9 @@ export default function IntakeForm({ onDone }: { onDone: () => void }) {
       </Section>
 
       <Section title="7. Drug and alcohol testing" note="Mandatory tests may occur several times weekly, with additional random tests. Urine, breath, or other reasonable program-approved methods may be used. Refusal, tampering, substitution, or failure to test may be a violation. A non-negative screen may require confirmation and review; testing does not replace medical care.">
-        {check("testing", "I consent to required drug and alcohol testing, including testing after an approved overnight stay. I will disclose medications that could affect a result.")}
+        <p>A drug and alcohol test is required before initial move-in and when returning after an overnight absence. Staff may also require testing when entering or returning to the residence under program rules. If a screen is positive, staff will review the result, prescribed medications, and any needed confirmation. After a confirmed positive result that violates program rules, Ashrei will deny initial admission or end program participation and ask the participant to leave through the applicable lawful process. The participant must demonstrate 30 consecutive days clean and sober before Ashrei considers readmission. A test result does not itself authorize a lockout or removal of belongings. Ashrei will follow applicable occupancy and property procedures.</p>
+        {check("testing", "I consent to drug and alcohol testing before initial move-in, upon return after an overnight absence, and as required under program rules. I will disclose medications that could affect a result.")}
+        {initial("entryTesting", "Entry testing and 30-day sobriety return policy. I agree to comply with these rules")}
         {sign("testing", "Drug and alcohol testing consent")}
       </Section>
 
@@ -168,9 +170,9 @@ export default function IntakeForm({ onDone }: { onDone: () => void }) {
         {check("visitors", "I will follow visitor limits and inform my visitors of the applicable rules.")}{initial("curfew", "Curfew and overnight policy")}
         <div className="packet-fieldset" style={{ marginTop: 16 }}>
           <strong>Curfew, unapproved absence, and return policy. Initial separately.</strong>
-          <p>If I stay out past curfew without approval, leave the property for one day or more without communicating with Ashrei or receiving approval, or receive a curfew violation, Ashrei may document the violation and consider corrective action or termination under the accountability policy. If Ashrei terminates my program participation for these reasons, I understand I will not be eligible to return to the program for 60 days.</p>
-          <p>Program termination does not immediately end any legal right to occupy or authorize a lockout. Ashrei will follow applicable notice and possession procedures. After I lawfully leave or my right to possession ends, Ashrei will document and handle any belongings left behind under applicable law, including boxing or storage when appropriate and arranging lawful retrieval. Ashrei will not remove my belongings or deny access solely because a violation report was entered.</p>
-          {initial("curfewAbsence", "Curfew, unapproved absence, storage, and 60-day return policy")}
+          <p>If I stay out past curfew without approval, leave the property for one day or more without communicating with Ashrei or receiving approval, or receive a curfew violation, Ashrei may document the violation and consider corrective action or terminate my program participation under the accountability policy. If my participation ends for these reasons, I will not be eligible to return to the program for 60 days.</p>
+          <p>After I lawfully leave or Ashrei lawfully recovers possession, I will no longer have access to the residence or permission to come onsite without Ashrei's approval. Ashrei will document belongings left behind, box or store them as permitted by law, and arrange pickup at a designated location without allowing me to enter the residence. Program termination or a write-up alone does not authorize an immediate lockout or removal of belongings. Ashrei will follow applicable notice, possession, and property procedures.</p>
+          {initial("curfewAbsence", "Curfew, unapproved absence, property pickup, and 60-day return policy. I agree to comply with these rules")}
         </div>
       </Section>
 
